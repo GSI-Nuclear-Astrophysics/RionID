@@ -5,3 +5,10 @@ fortranformat
 pytdms
 nibabel
 uproot3
+PyQt5
+scipy
+pyfftw
+nptdms
+matplotlib
+pyqtgraph
+toml

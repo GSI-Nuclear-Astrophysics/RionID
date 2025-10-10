@@ -23,39 +23,39 @@ class MainWindow(QWidget):
         self.setGeometry(10, 10, int(width * 0.9), int(height * 0.6))
 
         # Create a QSplitter to hold both the input and the visualization
-        #splitter = QSplitter(Qt.Horizontal)
-        #self.visualization_widget = CreatePyGUI()  # Initially empty
+        splitter = QSplitter(Qt.Horizontal)
+        self.visualization_widget = CreatePyGUI()  # Initially empty
         
-        #self.rion_input = RionID_GUI(plot_widget=self.visualization_widget)
+        self.rion_input = RionID_GUI(plot_widget=self.visualization_widget)
         # Left panel - Input widget (RionID_GUI content)
-        #splitter.addWidget(self.rion_input)
+        splitter.addWidget(self.rion_input)
         # Right panel - Visualization widget (CreatePyGUI content)
         
-        #splitter.addWidget(self.visualization_widget)
+        splitter.addWidget(self.visualization_widget)
         
         # clear out old simulated curves when RionID_GUI says so
-        #self.rion_input.clear_sim_signal.connect(
-        #    self.visualization_widget.clear_simulated_data
-        #)
+        self.rion_input.clear_sim_signal.connect(
+            self.visualization_widget.clear_simulated_data
+        )
         
         # Set initial size ratios (% input, % visualization)
-        #splitter.setSizes([int(0.1*width), int(0.9*width)])
+        splitter.setSizes([int(0.1*width), int(0.9*width)])
         # Dynamically resize both widgets
-        #splitter.setStretchFactor(0, 1)  
-        #splitter.setStretchFactor(1, 2) 
+        splitter.setStretchFactor(0, 1)  
+        splitter.setStretchFactor(1, 2) 
         
         # Create the main layout
-        #layout = QVBoxLayout()
-        #layout.addWidget(splitter)
-        #self.setLayout(layout)
+        layout = QVBoxLayout()
+        layout.addWidget(splitter)
+        self.setLayout(layout)
         
         # connect plot‐click signal to RionID_GUI’s stop slot
-        #self.visualization_widget.plotClicked.connect(self.rion_input.onPlotClicked)
+        self.visualization_widget.plotClicked.connect(self.rion_input.onPlotClicked)
         
         # Connect the RionID_GUI signal to update CreatePyGUI once data is available
-        #self.rion_input.visualization_signal.connect(self.update_visualization)
+        self.rion_input.visualization_signal.connect(self.update_visualization)
         # Connect the “overlay one simulation” signal so we don’t clear between curves
-        #self.rion_input.overlay_sim_signal.connect(self.overlay_simulation)
+        self.rion_input.overlay_sim_signal.connect(self.overlay_simulation)
         
     def overlay_simulation(self, data):
         """

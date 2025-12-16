@@ -1,5 +1,6 @@
 from iqtools.tools import read_rsa_specan_xml, read_rsa_data_csv, read_rsa_result_csv
 import numpy as np
+import ezodf
 import os
 
 def read_tdsm_bin(path):
@@ -11,7 +12,6 @@ def read_tdsm_bin(path):
     try:
         fre = np.fromfile(bin_fre_path, dtype=np.float64)
         time = np.fromfile(bin_time_path, dtype=np.float32)
-        #amp = np.fromfile(bin_amp_path, dtype=np.float32)
         amp = np.memmap(bin_amp_path, dtype=np.float32, mode='r', shape=(len(time), len(fre)))
     except IOError as e:
         raise Exception(f"Error reading files: {e}")

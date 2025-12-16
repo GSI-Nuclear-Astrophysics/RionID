@@ -1,23 +1,17 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, QComboBox, QGroupBox, QGridLayout, QDesktopWidget,  QCheckBox, QSplitter
-from PyQt5.QtCore import Qt, QLoggingCategory, QThread, pyqtSignal, QTimer, QEvent
-import argparse
-import os
+from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QSplitter, QDesktopWidget)
+from PyQt5.QtCore import Qt
 import logging as log
-from loguru import logger
-from numpy import argsort, where, append, shape 
-from rionid.importdata import ImportData
-from rionid.pyqtgraphgui import CreatePyGUI
-import toml
-from barion.amedata import AMEData
-from rionidgui.parameter_gui import RionID_GUI
+
+from .inputs import RionID_GUI
+from .plot import CreatePyGUI
 
 log.basicConfig(level=log.DEBUG)
 
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("RionID+")
+        self.setWindowTitle("RionID")
         width = QDesktopWidget().screenGeometry(-1).width()
         height = QDesktopWidget().screenGeometry(-1).height()
         self.setGeometry(100, 100, width, height)  # Set window size

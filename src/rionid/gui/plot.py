@@ -1,7 +1,8 @@
 import sys
 import numpy as np
 import pyqtgraph as pg
-from PyQt5.QtWidgets import QMainWindow, QApplication, QVBoxLayout, QWidget, QPushButton, QHBoxLayout, QLabel, QDesktopWidget
+from PyQt5.QtWidgets import (QMainWindow, QApplication, QVBoxLayout, QWidget, 
+                             QPushButton, QHBoxLayout, QLabel, QDesktopWidget)
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import QLoggingCategory, Qt
 
@@ -199,7 +200,7 @@ class CreatePyGUI(QMainWindow):
 
     def reset_view(self):
         # Reset the plot to the original X and Y ranges
-        self.plot_widget.setXRange(*self.initial_x_range, padding=0.05)
+        self.plot_widget.setXRange(*self.saved_x_range, padding=0.05)
         self.plot_widget.setYRange(min(self.z_exp), max(self.z_exp), padding=0.05)
 
     def add_buttons(self, main_layout):
@@ -237,23 +238,8 @@ class CreatePyGUI(QMainWindow):
         main_layout.addLayout(button_layout)
 
 
-# Example Usage:
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-
-    # Example data
-    experimental_data = np.array([[2.35000019e+08, 9.04612897e-02],
-                                  [2.35000057e+08, 9.07298288e-02],
-                                  [2.35000095e+08, 9.01448335e-02],
-                                  [2.54999905e+08, 9.01264557e-02],
-                                  [2.54999943e+08, 9.01772547e-02],
-                                  [2.54999981e+08, 9.03425368e-02]])
-
-    simulated_data = {
-        '1.0': np.array([['241127381.22165576', '0.00054777', '80Kr+35'],
-                         ['242703150.0762615', '0.0048654', '79Br+35']])
-    }
-
-    sa = CreatePyGUI(experimental_data, simulated_data)
+    sa = CreatePyGUI()
     sa.show()
     sys.exit(app.exec_())

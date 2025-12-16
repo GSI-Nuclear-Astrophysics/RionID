@@ -1,28 +1,36 @@
-from PyQt5.QtWidgets import QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QComboBox, QCheckBox, QFileDialog, QMessageBox, QGroupBox, QToolButton
-from PyQt5.QtCore import pyqtSignal, QThread, Qt
-from PyQt5.QtGui import QFont
+from PyQt5.QtWidgets import (QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, 
+                             QHBoxLayout, QComboBox, QCheckBox, QFileDialog, 
+                             QMessageBox, QGroupBox, QToolButton, QApplication)
+from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtGui import QFont, QCursor
 import toml
 import argparse
 import logging as log
 from loguru import logger
-from rionidgui.gui_controller import import_controller
 import sys
+
+from .controller import import_controller
 
 log.basicConfig(level=log.DEBUG)
 common_font = QFont()
-common_font.setPointSize(12) #font size
+common_font.setPointSize(12) 
 
 class RionID_GUI(QWidget):
     visualization_signal = pyqtSignal(object)
+    signalError = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
         self.initUI()
         self.load_parameters()  # Load parameters after initializing UI
+        self.signalError.connect(self.show_error_message)
 
     def initUI(self):
         self.setup_layout()
         self.setLayout(self.vbox)
+
+    def show_error_message(self, message):
+        QMessageBox.critical(self, 'Error', message)
 
     def load_parameters(self, filepath='parameters_cache.toml'):
         try:
@@ -262,6 +270,8 @@ class RionID_GUI(QWidget):
             QMessageBox.critical(self, 'Error', f'An error occurred: {str(e)}')
             log.error("Processing failed", exc_info=True)
             self.signalError.emit(str(e))
+        finally:
+            QApplication.restoreOverrideCursor()
 
 class CollapsibleGroupBox(QGroupBox):
     def __init__(self, title="", parent=None):

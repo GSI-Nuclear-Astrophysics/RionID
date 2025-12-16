@@ -1,6 +1,6 @@
 from numpy import argsort, where, append
 from loguru import logger
-from rionid.importdata import ImportData
+from rionid.core import ImportData
 from barion.amedata import AMEData
 
 def import_controller(datafile=None, filep=None, alphap=None, refion=None, harmonics = None, nions = None, amplitude=None, circumference = None, mode=None, value=None, reload_data=None):

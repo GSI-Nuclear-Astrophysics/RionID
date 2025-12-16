@@ -1,15 +1,22 @@
-from numpy import polyval, array, stack, append, sqrt, genfromtxt
+from numpy import polyval, array, stack, append, sqrt
 import sys
 import re
+import os
+import numpy as np
 
 from barion.ring import Ring
 from barion.amedata import AMEData
 from barion.particle import Particle
-
 from lisereader.reader import LISEreader
 
-from rionid.io import * 
-
+from rionid.io import (
+    read_psdata, 
+    handle_read_tdsm_bin, 
+    handle_read_tdsm, 
+    handle_read_rsa_specan_xml, 
+    handle_spectrumnpz_data, 
+    handle_tiqnpz_data
+)
 
 class ImportData(object):
     '''
@@ -27,19 +34,22 @@ class ImportData(object):
         self.experimental_data = None
         self.brho = 0 
         # Data cache file path
-        self.cache_file = self._get_cache_file_path(filename)
+        self.cache_file = self._get_cache_file_path(filename) if filename else None
 
         # Get the experimental data
         if filename is not None:
             if reload_data:
-                #print("reload_data ", reload_data)
                 self._get_experimental_data(filename)
                 self._save_experimental_data()
             else:
-                self._load_experimental_data()
+                try:
+                    self._load_experimental_data()
+                except FileNotFoundError:
+                    # Fallback if cache doesn't exist but reload wasn't requested
+                    self._get_experimental_data(filename)
         else:
             print("No experimental data file provided. Using default or simulated data.")
-            self.experimental_data = None  # Set empty or simulated data here
+            self.experimental_data = None
 
     def _get_cache_file_path(self, filename):
         base, _ = os.path.splitext(filename)
@@ -47,18 +57,17 @@ class ImportData(object):
     
     def _get_experimental_data(self, filename):
         base, file_extension = os.path.splitext(filename)
-        if file_extension.lower() == '.csv':
-            self.experimental_data = read_psdata(filename, dbm = False)
-        if file_extension.lower() == '.bin_fre' or file_extension.lower() == '.bin_time' or file_extension.lower() == '.bin_amp':
+        ext = file_extension.lower()
+
+        if ext == '.csv':
+            self.experimental_data = read_psdata(filename, dbm=False)
+        elif ext in ['.bin_fre', '.bin_time', '.bin_amp']:
             self.experimental_data = handle_read_tdsm_bin(filename)
-        if file_extension.lower() == '.tdms':
+        elif ext == '.tdms':
             self.experimental_data = handle_read_tdsm(filename)
-            #substitute this
-        if file_extension.lower() == '.xml':
+        elif ext in ['.xml', '.specan']:
             self.experimental_data = handle_read_rsa_specan_xml(filename)
-        if file_extension.lower() == '.Specan':
-            self.experimental_data = handle_read_rsa_specan_xml(filename)
-        if file_extension.lower() == '.npz':
+        elif ext == '.npz':
             if 'spectrum' in base:
                 self.experimental_data = handle_spectrumnpz_data(filename)
             else:
@@ -89,7 +98,6 @@ class ImportData(object):
         self.particles_to_simulate = lise.get_info_all()
 
     def _calculate_moqs(self, particles = None):
-        
         # Calculate the  moq from barion of the particles present in LISE file or of the particles introduced
         self.moq = dict()
         self.total_mass = dict()  # Initialize the total mass dictionary
@@ -128,7 +136,7 @@ class ImportData(object):
     def _simulated_data(self, brho = None, harmonics = None, particles = False,mode = None):
         for harmonic in harmonics:
             ref_moq = self.moq[self.ref_ion]
-            if mode == 'Bρ':
+            if mode == 'Brho':
                 ref_frequency =  self.ref_frequency*harmonic
                 self.brho = brho
             else:
@@ -185,8 +193,6 @@ class ImportData(object):
             Returns:
             float: magnetic rigidity (Bρ) in T*m (Tesla meters)
             """
-        # Speed of light in m/s
-        #c = 299792458.0
         
         # Calculate the actual frequency of the ion
         actual_frequency = frequency / harmonic
@@ -198,10 +204,10 @@ class ImportData(object):
         gamma = 1 / np.sqrt(1 - (v / AMEData.CC) ** 2)
         
         # Calculate the momentum p = γ m v
-        p = moq *AMEData.UU* gamma *  (v/AMEData.CC)/AMEData.CC
+        p = moq *AMEData.UU* gamma *  (v/AMEData.CC)
         
         # Calculate the magnetic rigidity (Bρ)
-        brho = p*1e6
+        brho = (p /AMEData.CC)*1e6
         return brho
                                                             
     def reference_frequency(self, fref = None, brho = None, ke = None, gam = None):
@@ -219,7 +225,8 @@ class ImportData(object):
             return ImportData.calc_ref_rev_frequency(self.ref_mass, self.ring.circumference,
                                                      gam = gam)
             
-        else: sys.exit('None frev, brho, ke or gam')
+        else: 
+            sys.exit('None frev, brho, ke or gam')
         
     @staticmethod
     def calc_ref_rev_frequency(ref_mass, ring_circumference, brho = None, ref_charge = None, ke = None, aa = None, gam = None):

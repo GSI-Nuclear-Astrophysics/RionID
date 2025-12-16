@@ -1,5 +1,0 @@
-iqtools==4.3.4
-loguru==0.7.2
-matplotlib==3.9.2
-toml==0.10.2
-watchdog==6.0.0

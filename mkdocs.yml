@@ -1,19 +1,20 @@
 site_name: RionID Documentation
-site_description: "Ring-stored ion IDdentification: Library to perform particle identification of a Schottky spectrum."
-site_url: "https://DFreireF.github.io/rionid"
-repo_url: "https://github.com/DFreireF/rionid"
+site_description: "Ring-stored ion IDentification software."
+site_url: "https://GSI-Nuclear-Astrophysics.github.io/rionid"
+repo_url: "https://github.com/GSI-Nuclear-Astrophysics/rionid"
 edit_uri: "blob/main/docs/"
-repo_name: "DFreireF/rionid"
+repo_name: "GSI-Nuclear-Astrophysics/rionid"
 site_dir: "site"
-watch: [README.md]
 
 theme:
   name: material
   logo: img/rionid.png
-  highlightjs: true
+  favicon: img/rionid.png
   features:
     - content.code.copy
-    - content.code.annotate
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -30,46 +31,30 @@ theme:
         icon: material/weather-night
         name: Switch to light mode
 
-markdown_extensions:
-  - admonition
-  - pymdownx.details
-  - pymdownx.emoji
-  - pymdownx.magiclink
-  - pymdownx.snippets:
-      check_paths: true
-  - pymdownx.superfences
-  - pymdownx.tabbed:
-      alternate_style: true
-  - pymdownx.tasklist
-
 plugins:
   - search
-  - mkdocstrings
+  - gen-files:
+      scripts:
+        - gen_doc_stubs.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: numpy
+            show_source: true
+            show_root_heading: true
 
 nav:
-  - Main page: index.md
-  - preRionID:
-    - __main__: prerionid/__main__.md
-    - datacrunch: prerionid/datacrunch.md
-    - e0018: prerionid/e0018.md
-    - psdata: prerionid/psdata.md
-    - watcher: prerionid/watcher.md
-  - RionID:
-    - __main__: rionid/__main__.md
-    - creategui: rionid/creategui.md
-    - importdata: rionid/importdata.md
-    - inputtools: rionid/inputtools.md
-    - pypeaks: rionid/pypeaks.md
-    - pyqtgraphgui: rionid/pyqtgraphgui.md
-  - RionID GUI:
-    - __main__: rionidgui/__main__.md
-    - gui: rionidgui/gui.md
-    - gui_controller: rionidgui/gui_controller.md
-    - parameter_gui: rionidgui/parameter_gui.md
+  - Home: index.md
+  - Documentation: reference/
 
 extra:
   social:
   - icon: fontawesome/brands/github
-    link: https://github.com/DFreireF
+    link: https://github.com/GSI-Nuclear-Astrophysics
 copyright: |
-  &copy; 2023 <a href="https://github.com/DFreireF"  target="_blank" rel="noopener">David Freire Fernández</a>
+  &copy; 2025 <a href="https://github.com/DFreireF" target="_blank">David Freire Fernández</a>

@@ -1,58 +1,48 @@
 [tool.poetry]
-name = "RionID"
-version = "0.0.0" 
-description = "Ring-stored ion IDentification"
-authors = ["DFreireF"]
+name = "rionid"
+version = "1.0.0"
+description = "Ring-stored ion IDentification: A pure Python tool for Schottky spectrum analysis."
+authors = ["David Freire-Fernández <D.FreireFernandez@gsi.de>"]
 license = "GPL-3.0-or-later"
 readme = "README.md"
-homepage = "https://dfreiref.github.io/rionid/"
-repository = "https://github.com/DFreireF/rionid"
-keywords = ["Physics", "Data", "Time series", "Data analysis"]
+homepage = "https://gsi-nuclear-astrophysics.github.io/rionid/"
+repository = "https://github.com/GSI-Nuclear-Astrophysics/rionid"
+keywords = ["Physics", "Nuclear Physics", "Storage Rings", "Mass Spectrometry", "Schottky"]
 
+# Recursively include everything in src/rionid
 packages = [
-    { include = "rionid" },
-    { include = "prerionid" },
-    { include = "rionidgui" }
+    { include = "rionid", from = "src" }
 ]
 
-[tool.poetry-dynamic-versioning]
-enable = true
-vcs = "git"
-
-[tool.poetry-dynamic-versioning.substitution]
-files = ["rionid/version.py"]
+# Ensure mass tables inside the vendorized barion are packaged
+include = [
+    "src/rionid/external/barion/*.mas20",
+    "src/rionid/external/barion/data/*"
+]
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = ">=3.9,<3.13"
 numpy = "*"
 scipy = "*"
-matplotlib = "*"
-beautifulsoup4 = "*"
-nibabel = "*"
-npTDMS = "*"
-pyTDMS = "*"
-uproot3 = "*"
-uproot3-methods = "*"
-fortranformat = "*"
-ezodf = "*"
-loguru = "*"
 PyQt5 = "*"
 pyqtgraph = "*"
+loguru = "*"
 toml = "*"
-watchdog = "*"
-# Git dependencies (fetched from GitHub)
-iqtools = { git = "https://github.com/xaratustrah/iqtools.git", rev = "main" }
-barion = { git = "https://github.com/xaratustrah/barion.git", rev = "main" }
-lisereader = { git = "https://github.com/gwgwhc/lisereader.git", rev = "main" }
-
+ezodf = "*"
+requests = "*"        # Required for Barion to download mass tables
+fortranformat = "*"
 [tool.poetry.group.dev.dependencies]
 pytest = "*"
 black = "*"
-ipython = "*"
+# Documentation dependencies
+mkdocs = "*"
+mkdocs-material = "*"
+mkdocstrings = {extras = ["python"], version = "*"}
+mkdocs-gen-files = "*"
+mkdocs-literate-nav = "*"
 
 [tool.poetry.scripts]
-rionid = "rionid.__main__:main"
-rionidgui = "rionidgui.__main__:main"
+rionid = "rionid.gui.app:main"
 
 [build-system]
 requires = ["poetry-core"]

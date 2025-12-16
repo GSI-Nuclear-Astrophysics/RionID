@@ -1,7 +1,0 @@
-barion==2.1.7
-ezodf==0.3.2
-iqtools==4.3.4
-LISEreader==0.1.1
-numpy==2.1.3
-PyQt5==5.15.11
-pyqtgraph==0.13.7

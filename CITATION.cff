@@ -7,7 +7,13 @@ authors:
 - family-names: "Hudson-Chang"
   given-names: "George"
   orcid: "https://orcid.org/0000-0001-6404-6153"
+- family-names: "Chen"
+  given-names: "Rui-Jiu"
+  orcid: "https://orcid.org/0000-0001-6283-8958"
+
 title: "rionid: Collection of code for the identification of ringed ions in Python"
 doi: 10.5281/zenodo.8169342
 date-released: 2023-07-20
-url: "https://github.com/DFreireF/rionid"
+url: "https://github.com/GSI-Nuclear-Astrophysics/rionid"
+
+  

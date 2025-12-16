@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - master
+      - main  # Added main just in case
+
+permissions:
+  contents: write
 
 jobs:
   deploy:
@@ -11,16 +15,19 @@ jobs:
 
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.10'
 
     - name: Install dependencies
       run: |
-        pip install mkdocs-material mkdocstrings[python]
+        # Install documentation tools
+        pip install mkdocs-material mkdocstrings[python] mkdocs-gen-files mkdocs-literate-nav
+        # Install the package itself (so mkdocstrings can import it)
+        pip install .
 
     - name: Deploy to GitHub Pages
       run: mkdocs gh-deploy --force

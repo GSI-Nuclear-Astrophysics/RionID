@@ -1,76 +1,72 @@
-# RionID (Ring-stored ion IDentification) Usage Guide
-[![documentation](https://img.shields.io/badge/docs-mkdocs%20material-blue.svg?style=flat)](https://DFreireF.github.io/rionid)[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8169341.svg)](https://doi.org/10.5281/zenodo.8169341)
+# RionID (Ring-stored ion IDentification)
 
+[![Documentation](https://img.shields.io/badge/docs-mkdocs%20material-blue.svg?style=flat)](https://GSI-Nuclear-Astrophysics.github.io/rionid)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8169341.svg)](https://doi.org/10.5281/zenodo.8169341)
+[![PyPI version](https://badge.fury.io/py/rionid.svg)](https://badge.fury.io/py/rionid)
+[![License](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
+**RionID** is a Python software for the identification of ions stored in storage rings. It simulates revolution frequencies based on magnetic rigidity or frequency settings and matches them against experimental Schottky spectra.
 
-`RionID` is a Python code that simulates the time-of-flight/revolution-frequency spectrum of particles stored in a storage ring. Here is a guide on how to use `RionID` (for more details please check [dfreiref.github.io/rionid/]([DFreireF.github.io/rionid/](https://DFreireF.github.io/rionid/))):
-
-<div class="center">
-  <img src="https://github.com/DFreireF/rionid/raw/master/docs/img/rionid.png?raw=true" width="50%">
+<div align="center">
+  <img src="https://github.com/GSI-Nuclear-Astrophysics/rionid/raw/master/docs/img/rionid.png?raw=true" width="50%">
 </div>
+
+## Features
+*   **Pure Python:** No ROOT dependencies required.
+*   **Automated Matching:** Includes Quick PID logic to scan $\alpha_p$ and Reference Frequency to find the best match ($\chi^2$ minimization).
+*   **Signal Processing:** Built-in baseline subtraction (BrPLS) and peak detection.
+*   **Standalone:** Bundles `barion` and `lisereader` (GPL-3.0) for easy installation without complex dependency management.
 
 ## Installation
 
-+    Download and install [Barion](https://github.com/xaratustrah/barion) from [@Xaratustrah](https://github.com/xaratustrah), [LISEreader](https://github.com/gwgwhc/lisereader) from [@gwgwhc](https://github.com/gwgwhc) and [PyROOT](https://root.cern/manual/python/)
+### Option 1: From PyPI (Recommended)
+RionID is available on the Python Package Index. This is the easiest way to install it along with all dependencies.
 
-+    Download or clone the `RionID` repository:
-  ```bash
-    git clone https://github.com/DFreireF/rionid.git
-  ```
-+    Then in the cloned directory: 
-  ```bash
-    pip install .
-  ```
+```bash
+pip install rionid
+```
+
+### Option 2: From Source
+If you want the development version:
+
+```bash
+git clone https://github.com/GSI-Nuclear-Astrophysics/rionid.git
+cd rionid
+pip install .
+```
+
 ## Usage
 
-Navigate to the directory containing the `RionID` code in your terminal.
-Run `python __main__.py [arguments]`, replacing `[arguments]` with the desired arguments (detailed below).
+### Graphical User Interface (GUI)
+Once installed, you can launch the GUI simply by typing:
+
+```bash
+rionid
+```
+
+### Command Line Interface (CLI)
+You can also run simulations directly from the terminal:
+
+```bash
+rionid datafile.npz -f 11.2452 -r 209Bi+83 -psim fragments.lpp -b 5.5
+```
 
 ## Arguments
 
-The following arguments are available for use with `RionID`:
-#### Main Arguments
+*   `datafile`: Input spectrum file (.npz, .csv, .txt).
+*   `-r`, `--refion`: Reference ion (e.g., `72Ge+35`).
+*   `-ap`, `--alphap`: Momentum compaction factor.
+*   `-psim`: LISE++ output file for fragment yields.
+*   `-hrm`: Harmonics to simulate.
+*   `-b`, `--brho`: Magnetic rigidity (Brho) [Tm].
+*   `-f`, `--fref`: Revolution frequency [Hz].
+*   `--remove_baseline`: Apply baseline subtraction.
+*   `--peak_threshold_pct`: Peak detection threshold (0.0 - 1.0).
 
-+    `datafile` (required): Name of the input file with data. Can also be a list of files in a txt file.
-+    `alphap`: Momentum compaction factor of the ring.
-+    `refion`: Reference ion with format NucleonsNameChargestate := AAXX+CC. Example: 72Ge+35, 1H+1, 238U+92...
-+    `filep`: Read list of particles to simulate. LISE file or something else.
+## Acknowledgements
+*   **Dr. RuiJiu Chen** for providing the C++ Time-of-Flight simulation code that inspired the backbone of this software.
+*   **Dr. Shahab Sanjari** for guidance on software architecture and Schottky analysis.
 
-#### Secondary Arguments
-
-+    `harmonics`: Harmonics to simulate.
-
-#### Arguments for Each Mode (Exclusive)
-
-+    `brho`: Brho value of the reference nucleus at ESR (isochronous mode).
-+    `kenergy`: Kinetic energy of reference nucleus at ESR (isochronous mode).
-+    `gamma`: Lorentz factor gamma of the reference particle.
-+    `fref`: Revolution frequency of the reference particle (standard mode).
-
-#### Arguments for Visualization
-
-+    `ndivs`: Number of divisions in the display.
-+    `amplitude`: Display of srf data options. 0 -> constant height, else->scaled.
-
-#### Actions
-
-+    `log`: Set the logging level.
-+    `show`: Show display. If not, save root file and close display.
-+    `outdir`: Output directory.
-+    `correct`: Correct simulated spectrum following a polynomial fit with paremeters given here.
-
-#### Example Usage: Dummy example
-
-```python
-    python -m rionid datafile.txt -f 11.2452 -r 209Bi+83 -psim datafile.psim -b 5.5 -d 8 -am 1 -s -o output_folder -c 1 2 3
+## License
+This project is licensed under the GNU General Public License v3.0. See the [LICENSE](LICENSE) file for details.
 ```
-
-This command would run `RionID` on the `datafile.txt` input file, using the standard mode with a `reference frequency` of 11.2452, a `reference ion` of `209Bi+83`, a particle input file of `datafile.psim`, a `brho` value of `5.5`, and displaying the data with `8 divisions`, `scaled amplitude`, and showing the display. The output files would be saved in the `output_folder directory`, and the `simulated spectrum` would be `corrected` using the polynomial fit parameters 1, 2, and 3.
-
-#### Tutorial:
-[Tutorial](https://github.com/gwgwhc/schottky_analysis_tutorial.git) for introducing yourself to Schottky data analysis by G. Hudson-Chang [@gwgwhc](https://github.com/gwgwhc/). 
-
-#### Acknowledgements:
-We acknowledge Dr. RuiJiu Chen ([@chenruijiu](https://github.com/chenruijiu/)) for providing a C++ code for the simulation of time-of-flight which we used as inspiration for the backbone of this code.
-<br />
-We acknowledge Dr. Shahab Sanjari ([@xaratustrah](https://github.com/xaratustrah/)) for the guiding our software coding, specially in the initial stages.

@@ -4,9 +4,10 @@ import logging as log
 import ezodf
 import sys
 from numpy import argsort, where, append, shape
-from rionid import CreateGUI, ImportData, CreatePyGUI
-from rionid.inouttools import *
 from PyQt5.QtWidgets import QApplication
+
+from rionid import ImportData, CreatePyGUI
+from rionid.io import write_arrays_to_ods
 
 def main():
     

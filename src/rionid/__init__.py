@@ -1,3 +1,2 @@
-from .creategui import CreateGUI
-from .importdata import ImportData
-from .pyqtgraphgui import CreatePyGUI
+from .core import ImportData
+from .gui.plot import CreatePyGUI

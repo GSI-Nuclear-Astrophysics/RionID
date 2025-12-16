@@ -8,7 +8,7 @@ from barion.particle import Particle
 
 from lisereader.reader import LISEreader
 
-from rionid.inouttools import * 
+from rionid.io import * 
 
 
 class ImportData(object):

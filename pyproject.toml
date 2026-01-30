@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "rionid"
-version = "1.0.0"
+version = "8.0.0"
 description = "Ring-stored ion IDentification: A pure Python tool for Schottky spectrum analysis."
 authors = ["David Freire-Fernández <D.FreireFernandez@gsi.de>"]
 license = "GPL-3.0-or-later"
@@ -9,37 +9,52 @@ homepage = "https://gsi-nuclear-astrophysics.github.io/rionid/"
 repository = "https://github.com/GSI-Nuclear-Astrophysics/rionid"
 keywords = ["Physics", "Nuclear Physics", "Storage Rings", "Mass Spectrometry", "Schottky"]
 
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
 # Recursively include everything in src/rionid
 packages = [
     { include = "rionid", from = "src" }
 ]
 
-# Ensure mass tables inside the vendorized barion are packaged
-include = [
-    "src/rionid/external/barion/*.mas20",
-    "src/rionid/external/barion/data/*"
-]
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/GSI-Nuclear-Astrophysics/rionid/issues"
+"Documentation" = "https://gsi-nuclear-astrophysics.github.io/rionid/"
+"Source Code" = "https://github.com/GSI-Nuclear-Astrophysics/rionid"
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.13"
-numpy = "*"
-scipy = "*"
-PyQt5 = "*"
-pyqtgraph = "*"
-loguru = "*"
-toml = "*"
-ezodf = "*"
-requests = "*"        # Required for Barion to download mass tables
-fortranformat = "*"
+numpy = "^2.0.2"
+scipy = "^1.10.1"
+PyQt5 = "^5.15.9"
+pyqtgraph = "^0.13.3"
+loguru = "^0.7.0"
+toml = "^0.10.2"
+ezodf = "^0.3.2"
+requests = "^2.31.0"        # Required for Barion to download mass tables
+fortranformat = "^2.0.3"
+lxml = "^6.0.2"
+
 [tool.poetry.group.dev.dependencies]
-pytest = "*"
-black = "*"
+pytest = "^8.0.0"
+black = "^25.0.0"
+
+[tool.poetry.group.docs]
+optional = true
+[tool.poetry.group.docs.dependencies]
 # Documentation dependencies
-mkdocs = "*"
-mkdocs-material = "*"
-mkdocstrings = {extras = ["python"], version = "*"}
-mkdocs-gen-files = "*"
-mkdocs-literate-nav = "*"
+mkdocs = "^1.5.0"
+mkdocs-material = "^9.5.0"
+mkdocstrings = {extras = ["python"], version = "^0.24.0"}
+mkdocs-gen-files = "^0.5.0"
+mkdocs-literate-nav = "^0.6.0"
 
 [tool.poetry.scripts]
 rionid = "rionid.gui.app:main"

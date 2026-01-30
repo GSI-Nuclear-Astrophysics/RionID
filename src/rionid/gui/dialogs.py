@@ -46,7 +46,7 @@ class KeySelectionDialog(QDialog):
         self.amp_combo = QComboBox()
         self.amp_combo.addItems(keys)
         
-        # Try to be smart: if 'arr_1' exists, set it as default for amplitude
+        # if 'arr_1' exists, set it as default for amplitude
         if len(keys) > 1:
             self.amp_combo.setCurrentIndex(1)
 

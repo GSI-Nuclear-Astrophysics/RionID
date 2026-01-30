@@ -7,3 +7,4 @@ toml
 ezodf
 requests
 fortranformat
+lxml

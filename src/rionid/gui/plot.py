@@ -4,278 +4,329 @@ import re
 import pyqtgraph as pg
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QVBoxLayout, QWidget, 
                              QPushButton, QHBoxLayout, QLabel, QDesktopWidget, QSpinBox)
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QColor, QBrush
 from PyQt5.QtCore import QLoggingCategory, Qt, pyqtSignal
 
+ 
 class CustomLegendItem(pg.LegendItem):
-    """
-    A subclass of pyqtgraph.LegendItem that supports dynamic font sizing.
-
-    Standard pyqtgraph legends do not easily support font updates after initialization.
-    This class overrides the item addition to apply a custom QFont.
-
-    Parameters
-    ----------
-    font_size : int
-        The initial point size of the font.
-    """
+    """Custom Legend with dynamic font sizing."""
     def __init__(self, font_size, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.font = QFont("Arial", font_size)
+        self.brush = pg.mkBrush(255, 255, 255, 200) 
+        self.pen = pg.mkPen('k', width=0.5)
 
     def addItem(self, item, name):
-        """
-        Adds an item to the legend with the custom font applied to the label.
-        """
         label = pg.LabelItem(text=name, justify='left')
         label.setFont(self.font)
         super().addItem(item, name)
     
     def updateFont(self, font_size):
-        """
-        Updates the font size for future items added to the legend.
-        
-        Note: Existing items are not automatically resized in this simple implementation;
-        the legend is usually cleared and rebuilt during plot updates.
-        """
         self.font.setPointSize(font_size)
+    
+    def paint(self, p, *args):
+        p.setPen(self.pen)
+        p.setBrush(self.brush)
+        p.drawRect(self.boundingRect())
+        super().paint(p, *args)
 
 class CreatePyGUI(QMainWindow):
     """
     The main visualization widget for RionID.
-
-    This class handles the plotting of experimental spectra (blue lines),
-    detected peaks (red triangles), and simulated ion revolution frequencies
-    (dashed lines). It supports zooming, cursor tracking, and dynamic font sizing.
-
-    Attributes
-    ----------
-    plotClicked : pyqtSignal
-        Signal emitted when the user clicks on the plot area (used for 'Pick' mode).
-    plot_widget : pg.PlotWidget
-        The central pyqtgraph widget.
     """
     plotClicked = pyqtSignal()
 
     def __init__(self, exp_data=None, sim_data=None):
-        """
-        Initializes the plotting window.
-
-        Parameters
-        ----------
-        exp_data : tuple, optional
-            Initial experimental data (freq, amp).
-        sim_data : dict, optional
-            Initial simulation dictionary.
-        """
         super().__init__()
         self.saved_x_range = None  
         self.simulated_items = []
         self.red_triangles = None
-        self.exp_data_line = None
-        self.font_size = 20
+        self.exp_data_curve = None
+        self.font_size = 14 
+
+        pg.setConfigOptions(antialias=True)  
+        pg.setConfigOption('background', 'k') 
+        pg.setConfigOption('foreground', 'w')   
+        
+        self.x_exp = np.array([])
+        self.z_exp = np.array([])
         
         self.setup_ui()
-        
-        # Connect scene click for "Pick Mode"
         self.plot_widget.scene().sigMouseClicked.connect(self.on_click)
 
     def on_click(self, event):
-        """Emits the plotClicked signal when the mouse is clicked."""
         self.plotClicked.emit()
 
     def setup_ui(self):
-        """Sets up the layout, plot widget styling, axes, and control buttons."""
         self.setWindowTitle('Schottky Signals Identifier')
         self.main_widget = QWidget(self)
         self.setCentralWidget(self.main_widget)
         main_layout = QVBoxLayout(self.main_widget)
         
-        # Suppress annoying Qt warnings
         QLoggingCategory.setFilterRules('*.warning=false\n*.critical=false')
         
-        # Configure PlotWidget
         self.plot_widget = pg.PlotWidget()
-        self.plot_widget.setBackground('w') # White background
-        self.plot_widget.plotItem.ctrl.logYCheck.setChecked(True) # Default to Log Y
-        
-        # Configure Legend
-        self.legend = CustomLegendItem(self.font_size, offset=(-10, 10))
-        self.legend.setParentItem(self.plot_widget.graphicsItem())
-        self.legend.setBrush(pg.mkBrush('white'))
-        self.legend.setLabelTextColor('black')
+        self.plot_widget.showGrid(x=True, y=True, alpha=0.25)
+        self.plot_widget.plotItem.ctrl.logYCheck.setChecked(True)
+        self.plot_widget.setClipToView(True) 
         
         # Style Axes
-        self.plot_widget.getAxis('bottom').setPen(pg.mkPen('black'))
-        self.plot_widget.getAxis('left').setPen(pg.mkPen('black'))
-        self.plot_widget.getAxis('bottom').setTextPen('black')
-        self.plot_widget.getAxis('left').setTextPen('black')
+        axis_pen = pg.mkPen(color='w', width=1.5)
+        self.plot_widget.getAxis('bottom').setPen(axis_pen)
+        self.plot_widget.getAxis('left').setPen(axis_pen)
+        self.plot_widget.getAxis('bottom').setTextPen('w')
+        self.plot_widget.getAxis('left').setTextPen('w')
+        
+        self.legend = CustomLegendItem(self.font_size, offset=(-10, 10))
+        self.legend.brush = pg.mkBrush(0, 0, 0, 150) # Semi-transparent black box
+        self.legend.pen = pg.mkPen('w', width=0.5)   # White border
+        self.legend.setParentItem(self.plot_widget.graphicsItem())
         
         main_layout.addWidget(self.plot_widget)
         
-        # Cursor Label
         self.cursor_pos_label = QLabel(self)
-        self.cursor_pos_label.setStyleSheet("color: black;")
+        self.cursor_pos_label.setStyleSheet("color: black; font-weight: bold;")
         main_layout.addWidget(self.cursor_pos_label)
         self.proxy = pg.SignalProxy(self.plot_widget.scene().sigMouseMoved, rateLimit=60, slot=self.mouse_moved)
         
         self.add_buttons(main_layout)
         self.update_fonts(self.font_size)
 
-    def plot_all_data(self, data):
+    def _sanitize_positive(self, data, floor=1e-9):
         """
-        Clears the plot and redraws both experimental and simulated data.
+        Aggressively sanitizes data for Log plotting.
+        Removes NaNs, Infs, and values <= 0.
+        """
+        data = np.asanyarray(data, dtype=float)
+        # Replace NaNs and Infs with floor
+        data[~np.isfinite(data)] = floor
+        return np.maximum(data, floor)
 
-        Parameters
-        ----------
-        data : ImportData
-            The data model object containing experimental arrays and simulation results.
-        """
-        # We clear specific items rather than the whole widget to preserve Legend/Axis config
-        self.clear_experimental_data()
-        self.clear_simulated_data()
-        
-        self.plot_experimental_data(data)
-        self.plot_simulated_data(data)
+    def plot_all_data(self, data):
+        # Disable auto-range to prevent ViewBox from calculating bounds on partial data
+        self.plot_widget.disableAutoRange()
+        try:
+            self.clear_experimental_data()
+            self.clear_simulated_data()
+            self.plot_experimental_data(data)
+            self.plot_simulated_data(data)
+            
+            # Restore view or auto-range if first load
+            if self.saved_x_range:
+                self.plot_widget.setXRange(*self.saved_x_range, padding=0.02)
+            else:
+                self.plot_widget.autoRange()
+        finally:
+            self.plot_widget.enableAutoRange()
 
     def plot_experimental_data(self, data):
-        """
-        Plots the experimental spectrum and detected peaks.
-
-        Parameters
-        ----------
-        data : ImportData
-            Must contain `experimental_data` (tuple) and optionally `peak_freqs`.
-        """
         if data.experimental_data is None: return
         self.exp_data = data.experimental_data
         
-        self.x_exp, self.z_exp = self.exp_data[0]*1e-6, self.exp_data[1]
+        # Extract and Sanitize
+        self.x_exp = self.exp_data[0] * 1e-6 # Hz -> MHz
+        self.z_exp = self._sanitize_positive(self.exp_data[1])
         
-        # Auto-range only on first load
-        if self.saved_x_range is None:
-            self.saved_x_range = (min(self.x_exp), max(self.x_exp))
-            self.plot_widget.setXRange(*self.saved_x_range, padding=0.05)
+        if len(self.x_exp) == 0: return
 
-        # Plot Spectrum (Blue Line)
-        self.exp_data_line = self.plot_widget.plot(self.x_exp, self.z_exp, pen=pg.mkPen('blue', width=2))
-        self.legend.addItem(self.exp_data_line, 'Experimental Data')
+        if self.saved_x_range is None:
+            self.saved_x_range = (np.min(self.x_exp), np.max(self.x_exp))
+
+        pen = pg.mkPen(color='w', width=1.0)
+        brush = pg.mkBrush(color=(255, 255, 255, 50)) # White with low opacity
         
-        # Plot Peaks (Red Triangles)
+        # Use fillLevel matching the floor to avoid log(-inf) issues
+        self.exp_data_curve = pg.PlotCurveItem(
+            self.x_exp, self.z_exp, 
+            pen=pen, 
+            brush=brush, 
+            fillLevel=1e-9 
+        )
+        self.plot_widget.addItem(self.exp_data_curve)
+        self.legend.addItem(self.exp_data_curve, 'Experimental Data')
+        
+        # Plot Peaks
         if hasattr(data, 'peak_freqs') and len(data.peak_freqs) > 0:
+            peak_h = self._sanitize_positive(data.peak_heights)
+            
             self.red_triangles = self.plot_widget.plot(
-                data.peak_freqs * 1e-6, data.peak_heights,
-                pen=None, symbol='t', symbolBrush='r', symbolSize=12
+                data.peak_freqs * 1e-6, peak_h,
+                pen=None, 
+                symbol='t1', 
+                symbolBrush='#d62728', 
+                symbolPen='k',
+                symbolSize=10
             )
-            self.legend.addItem(self.red_triangles, 'Peaks')
+            self.legend.addItem(self.red_triangles, 'Detected Peaks')
 
     def plot_simulated_data(self, data):
-        """
-        Plots vertical lines for simulated ion frequencies.
-
-        Applies color coding:
-        - Green: Highlighted ions (matches).
-        - Orange: Reference ion.
-        - Varied Colors: Other harmonics.
-
-        Parameters
-        ----------
-        data : ImportData
-            Must contain `simulated_data_dict`, `ref_ion`, and `highlight_ions`.
-        """
         self.simulated_data = data.simulated_data_dict
         refion = data.ref_ion
         highlights = data.highlight_ions or []
         
+        color_cycle = ['#1f77b4', '#17becf', '#2ca02c', '#d62728', '#9467bd', 
+                       '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22']
+        
+        color_ref = '#ff7f0e' # Orange for Reference
+        color_match = '#2ca02c' # Green for Matches
+        
         for i, (harmonic, sdata) in enumerate(self.simulated_data.items()):
-            color = pg.intColor(i, hues=len(self.simulated_data))
+            # Arrays for bulk plotting (Vectorization)
+            bulk_freqs = []
+            bulk_yields = []
+            
+            # Generate a unique color for this harmonic
+            color = color_cycle[i % len(color_cycle)]
+            
             for entry in sdata:
-                freq = float(entry[0])*1e-6
+                try:
+                    freq = float(entry[0]) * 1e-6
+                    raw_yield = float(entry[1])
+                except (ValueError, TypeError):
+                    continue
+                
+                if not np.isfinite(freq): continue
+                yield_value = max(raw_yield, 1.1e-9)
                 label = entry[2]
-                yield_value = float(entry[1])
                 
-                # Determine Color
-                if label in highlights: label_color = 'green'
-                elif label == refion: label_color = 'orange'
-                else: label_color = color
+                is_highlight = label in highlights
+                is_ref = label == refion
                 
-                # Format Label (Superscript)
+                # Determine Style
+                if is_highlight:
+                    c = color_match
+                    width = 2
+                    style = Qt.SolidLine
+                elif is_ref:
+                    c = color_ref
+                    width = 2
+                    style = Qt.DashLine
+                else:
+                    c = color
+                    # No need for width/style here, handled by bulk curve
+                
+                # Create Text Label
+                # Note: Creating thousands of TextItems is still slow. 
+                # Use the '-n' (nions) argument to limit this if it's still laggy.
                 match = re.match(r'(\d+)([A-Za-z]+)(\d+)\+', label)
                 if match:
                     mass, elem, charge = match.groups()
                     new_label = self.to_superscript(mass) + elem + self.to_superscript(charge) + '⁺'
-                else: new_label = label
+                else: 
+                    new_label = label
                 
-                # Plot Line
-                line = self.plot_widget.plot([freq, freq], [1e-10, yield_value], pen=pg.mkPen(color=label_color, width=1, style=Qt.DashLine))
+                text_item = pg.TextItem(text=new_label, color=c, anchor=(0.5, 1))
+                text_item.setFont(QFont("Arial", self.font_size))
+                text_item.setPos(freq, yield_value * 1.05)
+                self.plot_widget.addItem(text_item)
+
+                if is_highlight or is_ref:
+                    # Plot SPECIAL lines individually (so they draw on top with specific styles)
+                    line = self.plot_widget.plot(
+                        [freq, freq], [1e-9, yield_value], 
+                        pen=pg.mkPen(color=c, width=width, style=style)
+                    )
+                    self.simulated_items.append((line, text_item))
+                else:
+                    # Add STANDARD lines to bulk arrays for optimization
+                    bulk_freqs.append(freq)
+                    bulk_yields.append(yield_value)
+                    # Track text item (line is None because it's part of the bulk curve)
+                    self.simulated_items.append((None, text_item))
+
+            # --- BULK PLOT ---
+            # Draw all standard lines for this harmonic in ONE go
+            if bulk_freqs:
+                # Interleave arrays for connect='pairs'
+                # x: [f1, f1, f2, f2, ...]
+                # y: [min, y1, min, y2, ...]
+                x_conn = np.repeat(bulk_freqs, 2)
+                y_conn = np.empty(len(bulk_yields) * 2)
+                y_conn[0::2] = 1e-9
+                y_conn[1::2] = bulk_yields
                 
-                # Plot Label
-                text = pg.TextItem(text=new_label, color=label_color, anchor=(0, 0.5))
-                text.setFont(QFont("Arial", self.font_size))
-                text.setAngle(90)
-                text.setPos(freq, yield_value * 1.2)
-                self.plot_widget.addItem(text)
+                bulk_pen = pg.mkPen(color=color, width=2, style=Qt.DotLine)
                 
-                self.simulated_items.append((line, text))
-            
-            self.legend.addItem(line, f'Harmonic {harmonic}')
+                # connect='pairs' tells PyQtGraph to draw disjoint lines: (p0->p1), (p2->p3), etc.
+                bulk_curve = pg.PlotCurveItem(x_conn, y_conn, connect='pairs', pen=bulk_pen)
+                self.plot_widget.addItem(bulk_curve)
+                
+                # Track the bulk curve so we can clear it later
+                self.simulated_items.append((bulk_curve, None))
+                
+                # Add to legend
+                self.legend.addItem(bulk_curve, f'Harmonic {harmonic}')
 
     def to_superscript(self, s):
-        """Converts a string of numbers to unicode superscripts."""
         supers = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'}
         return ''.join(supers.get(c, c) for c in s)
 
     def update_fonts(self, size):
-        """Updates the font size for axes and legends dynamically."""
         self.font_size = size
-        self.font_ticks = QFont()
-        self.font_ticks.setPixelSize(size)
+        self.font_ticks = QFont("Arial", size)
         self.plot_widget.getAxis('bottom').setTickFont(self.font_ticks)
         self.plot_widget.getAxis('left').setTickFont(self.font_ticks)
+        
+        label_style = {'color': '#000', 'font-size': f'{size+2}pt'}
+        self.plot_widget.setLabel('bottom', 'Frequency (MHz)', **label_style)
+        self.plot_widget.setLabel('left', 'Amplitude (a.u.)', **label_style)
+        
         self.legend.updateFont(size)
 
     def mouse_moved(self, evt):
-        """Updates the cursor position label when the mouse moves over the plot."""
         pos = evt[0]
         if self.plot_widget.sceneBoundingRect().contains(pos):
             mousePoint = self.plot_widget.plotItem.vb.mapSceneToView(pos)
-            self.cursor_pos_label.setText(f"Cursor: x={mousePoint.x():.4f}, y={mousePoint.y():.2f}")
+            self.cursor_pos_label.setText(f"Cursor: {mousePoint.x():.4f} MHz")
 
     def updateData(self, data):
-        """Public slot to update the plot with new data."""
         self.plot_all_data(data)
 
     def clear_simulated_data(self):
-        """Removes all simulated lines and labels from the plot."""
         while self.simulated_items:
             line, text = self.simulated_items.pop()
-            self.plot_widget.removeItem(line)
-            self.plot_widget.removeItem(text)
+            if line: 
+                self.plot_widget.removeItem(line)
+            if text: 
+                self.plot_widget.removeItem(text)
         self.legend.clear()
 
     def clear_experimental_data(self):
-        """Removes the experimental spectrum and peak markers."""
-        if self.exp_data_line:
-            self.plot_widget.removeItem(self.exp_data_line)
-            self.exp_data_line = None
+        if self.exp_data_curve:
+            self.plot_widget.removeItem(self.exp_data_curve)
+            self.exp_data_curve = None
         
         if self.red_triangles:
             self.plot_widget.removeItem(self.red_triangles)
             self.red_triangles = None
 
+    def reset_view(self):
+        if self.saved_x_range:
+            self.plot_widget.setXRange(*self.saved_x_range, padding=0.02)
+        
+        if len(self.z_exp) > 0:
+            min_y = np.min(self.z_exp)
+            max_y = np.max(self.z_exp)
+            if min_y <= 0: min_y = 1e-9
+            self.plot_widget.setYRange(min_y, max_y * 2, padding=0.05)
+
     def add_buttons(self, main_layout):
-        """Adds the control buttons (Font size, Reset View) to the layout."""
         layout = QHBoxLayout()
         
         font_spin = QSpinBox()
-        font_spin.setRange(10, 30)
+        font_spin.setRange(8, 30)
         font_spin.setValue(self.font_size)
         font_spin.valueChanged.connect(self.update_fonts)
-        layout.addWidget(QLabel("Font Size:"))
+        
+        lbl = QLabel("Font Size:")
+        lbl.setFont(QFont("Arial", 12))
+        
+        layout.addWidget(lbl)
         layout.addWidget(font_spin)
         
         reset_btn = QPushButton("Reset View")
-        reset_btn.clicked.connect(lambda: self.plot_widget.autoRange())
+        reset_btn.setFont(QFont("Arial", 12))
+        reset_btn.clicked.connect(self.reset_view)
         layout.addWidget(reset_btn)
         
         main_layout.addLayout(layout)

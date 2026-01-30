@@ -94,6 +94,9 @@ def main():
             show=args.show,
             app=app
         )
+    
+    if args.show and app:
+        sys.exit(app.exec_())
 
 def run_controller(data_file, particles_to_simulate, alphap, ref_ion, harmonics, 
                    brho=None, fref=None, ke=None, gam=None, correct=None, 
@@ -169,8 +172,6 @@ def run_controller(data_file, particles_to_simulate, alphap, ref_ion, harmonics,
     if show and app:
         sa = CreatePyGUI(mydata.experimental_data, mydata.simulated_data_dict)
         sa.show()
-        # This blocks execution until the window is closed
-        app.exec_()
 
 def display_nions(nions, yield_data, nuclei_names, simulated_data_dict, ref_ion, harmonics):
     """Filters the top N ions by yield."""

@@ -14,9 +14,7 @@ from rionid.external.lisereader.reader import LISEreader
 from rionid.io import (
     read_psdata, 
     handle_read_tdsm_bin, 
-    handle_read_tdsm, 
-    handle_read_rsa_specan_xml, 
-    handle_spectrumnpz_data, 
+    handle_spectrumnpz_data, # probably I will just keep this option, delete the others
     handle_tiqnpz_data
 )
 from rionid.baseline import NONPARAMS_EST
@@ -72,11 +70,14 @@ class ImportData(object):
         self.total_mass = dict()
         self.yield_data = []
         
-        self.ref_ion = refion
         self.highlight_ions = self._parse_highlight_ions(highlight_ions)
         self.alphap = alphap
-        self.gammat = (1/alphap)**0.5 if alphap > 0 else 0
+        self.gammat = 1.0 / (self.alphap ** 0.5)
+
         self.ring = Ring('ESR', circumference)
+
+        self.ref_ion = refion.strip()
+        self._parse_ref_ion(refion)
         
         # Physics / Matching Params
         self.peak_threshold_pct = float(peak_threshold_pct) if peak_threshold_pct else 0.05
@@ -94,6 +95,7 @@ class ImportData(object):
         self.match_count = 0
         
         self.cache_file = self._get_cache_file_path(filename) if filename else None
+        self.experimental_data = None
 
         if filename is not None:
             if reload_data:
@@ -102,12 +104,66 @@ class ImportData(object):
             else:
                 try:
                     self._load_experimental_data()
-                except FileNotFoundError:
+                except (FileNotFoundError, IOError):
                     self._get_experimental_data(filename)
             
-            # Process peaks after loading
+            # --- NEW DATA PROCESSING BLOCK ---
+            if self.experimental_data is not None:
+                freq, amp = self.experimental_data
+                
+                # 1. Baseline Removal
+                if remove_baseline:
+                    try:
+                        est = NONPARAMS_EST(amp)
+                        baseline = est.pls('BrPLS', l=psd_baseline_removed_l, ratio=1e-6)
+                        amp = amp - baseline
+                    except Exception as e:
+                        print(f"Baseline removal failed: {e}")
+                        traceback.print_exc()
+
+                # 2. Log-Safety (Clip negatives)
+                # Ensure all values are > 0 for logarithmic plotting. 
+                # We use 1e-9 as a "floor" value.
+                amp = np.maximum(amp, 1e-29)
+
+                # 3. Normalization
+                # Scale so the highest peak is 1.0
+                max_val = np.max(amp)
+                if max_val > 0:
+                    amp = amp / max_val
+                
+                # Update the stored data
+                self.experimental_data = (freq, amp)
+            # ---------------------------------
+
+            # Process peaks after loading and processing
             self.detect_peaks_and_widths()
     
+    def _parse_ref_ion(self, refion):
+        # Regex to extract Mass(Digits), Element(Letters), Charge(Digits)
+        # It handles both '98Zr+39' and '98Zr39+' inputs
+        match = re.match(r'(\d+)([a-zA-Z]+).*?(\d+)', self.ref_ion)
+        if match:
+            self.ref_aa = int(match.group(1))
+            self.ref_el = match.group(2)
+            self.ref_charge = int(match.group(3))
+            # Force standard format: 98Zr39+
+            self.ref_ion = f"{self.ref_aa}{self.ref_el}{self.ref_charge}+"
+        else:
+            # Fallback parsing
+            try:
+                # Try splitting by '+' if it exists in the middle
+                if '+' in refion and not refion.endswith('+'):
+                    parts = refion.split('+')
+                    self.ref_charge = int(parts[1])
+                    self.ref_aa = int(re.split(r'(\d+)', parts[0])[1])
+                else:
+                    # Assume format like 98Zr39+
+                    self.ref_charge = int(re.findall(r'\d+', refion)[-1])
+                    self.ref_aa = int(re.findall(r'\d+', refion)[0])
+            except:
+                print(f"Warning: Could not parse reference ion '{refion}'.")
+
     def _parse_highlight_ions(self, input_str):
         """Parses a comma-separated string of ions into a list."""
         if not input_str: return []
@@ -128,15 +184,12 @@ class ImportData(object):
             self.experimental_data = read_psdata(filename, dbm=False)
         elif ext in ['.bin_fre', '.bin_time', '.bin_amp']:
             self.experimental_data = handle_read_tdsm_bin(filename)
-        elif ext == '.tdms':
-            self.experimental_data = handle_read_tdsm(filename)
-        elif ext in ['.xml', '.specan']:
-            self.experimental_data = handle_read_rsa_specan_xml(filename)
         elif ext == '.npz':
-            if 'spectrum' in base:
-                self.experimental_data = handle_spectrumnpz_data(filename, **self.io_params)
-            else:
-                self.experimental_data = handle_tiqnpz_data(filename, **self.io_params)
+            self.experimental_data = handle_spectrumnpz_data(filename, **self.io_params)
+            #if 'spectrum' in base:
+            #    self.experimental_data = handle_spectrumnpz_data(filename, **self.io_params)
+            #else:
+            #    self.experimental_data = handle_tiqnpz_data(filename, **self.io_params)
         elif ext == '.root':
             raise ValueError("ROOT files are not supported in this version. Please convert to NPZ/CSV.")
         
@@ -166,7 +219,7 @@ class ImportData(object):
             amp,
             height=height_thresh,
             distance=self.min_distance,
-            prominence=height_thresh * 0.3,
+            prominence=height_thresh * 0.2,
             width=1
         )
         
@@ -257,12 +310,12 @@ class ImportData(object):
         else:
             raise FileNotFoundError("Cached data file not found. Please set reload_data to True to generate it.")
 
-    def _set_particles_to_simulate_from_file(self, particles_to_simulate, verbose=None):
+    def _set_particles_to_simulate_from_file(self, particles_to_simulate):
         """Parses the LISE++ output file."""
         self.ame = AMEData()
         self.ame_data = self.ame.ame_table
         lise = LISEreader(particles_to_simulate)
-        self.particles_to_simulate = lise.get_info_all(verbose=verbose)
+        self.particles_to_simulate = lise.get_info_all()
 
     def _calculate_moqs(self, particles = None):
         """Calculates mass-to-charge ratios for all particles."""
@@ -299,7 +352,8 @@ class ImportData(object):
         self.srrf = array([1 - self.alphap * (self.moq[name] - self.moq[self.ref_ion]) / self.moq[self.ref_ion]
                            for name in self.moq])
         if correct:
-            self.srrf = self.srrf + polyval(array(correct), self.srrf * self.ref_frequency) / self.ref_frequency
+            correction = polyval(array(correct), self.srrf * self.ref_frequency)
+            self.srrf = self.srrf + correction / self.ref_frequency
 
     def _simulated_data(self, brho=None, harmonics=None, mode=None, sim_scalingfactor=None, nions=None):
         """Generates the final simulation dictionary for plotting."""
@@ -328,15 +382,15 @@ class ImportData(object):
 
         self.nuclei_names = array(moq_keys)
         self.yield_data = np.array(self.yield_data, dtype=float)
+        max_yield = np.max(self.yield_data)
+        if max_yield > 0:
+            self.yield_data /= max_yield
+            
         if sim_scalingfactor:
             self.yield_data *= sim_scalingfactor
 
         for harmonic in harmonics:
-            if mode == 'Frequency':
-                harmonic_freq = self.srrf * self.ref_frequency
-            else:
-                harmonic_freq = self.srrf * self.ref_frequency * harmonic
-            
+            harmonic_freq = self.srrf * self.ref_frequency * harmonic
             arr_stack = stack((harmonic_freq, self.yield_data, self.nuclei_names), axis=1)
             self.simulated_data_dict[f'{harmonic}'] = arr_stack
     

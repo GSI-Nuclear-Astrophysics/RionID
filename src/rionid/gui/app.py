@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QSplitter, QDesktopWidget)
+from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QSplitter)
 from PyQt5.QtCore import Qt
 import logging as log
 
@@ -31,15 +31,20 @@ class MainWindow(QWidget):
         super().__init__()
         self.setWindowTitle("RionID")
         
-        # Center and Size Window based on screen resolution
-        width = QDesktopWidget().screenGeometry(-1).width()
-        height = QDesktopWidget().screenGeometry(-1).height()
-        self.setGeometry(100, 100, width, height) 
+        screen = QApplication.primaryScreen()
+        screen_geom = screen.availableGeometry()
+        width = int(screen_geom.width() * 0.8)
+        height = int(screen_geom.height() * 0.8)
+        
+        # Center the window
+        x = (screen_geom.width() - width) // 2
+        y = (screen_geom.height() - height) // 2
+        self.setGeometry(x, y, width, height)   
 
         # Create a QSplitter to hold both the input and the visualization
         splitter = QSplitter(Qt.Horizontal)
 
-        # 1. Create Visualization Widget FIRST
+        # Create Visualization Widget FIRST
         # We must create this first because rion_input needs a reference to it
         # to handle the 'Pick' cursor events.
         self.visualization_widget = CreatePyGUI()

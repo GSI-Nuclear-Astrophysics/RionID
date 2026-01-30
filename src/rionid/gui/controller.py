@@ -1,7 +1,7 @@
 from numpy import argsort, where, append
 from loguru import logger
 from rionid.core import ImportData
-from barion.amedata import AMEData
+from rionid.external.barion.amedata import AMEData
 
 def import_controller(datafile=None, filep=None, alphap=None, refion=None, harmonics=None, 
                       nions=None, amplitude=None, circumference=None, mode=None, value=None, 
@@ -86,7 +86,6 @@ def import_controller(datafile=None, filep=None, alphap=None, refion=None, harmo
         elif mode == 'Brho': brho = float(value)
         elif mode == 'Kinetic Energy': ke = float(value)
         elif mode == 'Gamma': gam = float(value)
-
         # Calculations 
         mydata = ImportData(refion, float(alphap), filename=datafile, reload_data=reload_data, 
                             circumference=circumference, highlight_ions=highlight_ions,
@@ -120,7 +119,7 @@ def import_controller(datafile=None, filep=None, alphap=None, refion=None, harmo
     
     except Exception as e:
         print(f"Error during calculations: {str(e)}")
-        return e
+        raise e
 
 def display_nions(nions, yield_data, nuclei_names, simulated_data_dict, ref_ion, harmonics):
     """
@@ -144,15 +143,24 @@ def display_nions(nions, yield_data, nuclei_names, simulated_data_dict, ref_ion,
     harmonics : list of float
         The list of harmonics being simulated.
     """
+    # 1. Get indices of the top N ions
     sorted_indices = argsort(yield_data)[::-1][:nions]
+    
+    # 2. Find the index of the reference ion
     ref_index = where(nuclei_names == ref_ion)[0]
-    if ref_index not in sorted_indices:
-        sorted_indices = append(sorted_indices, ref_index)
+    
+    # 3. FIX: Check if ref_index is not empty AND if the scalar index is missing
+    if ref_index.size > 0 and ref_index[0] not in sorted_indices:
+        sorted_indices = append(sorted_indices, ref_index[0])
+        
+    # 4. Filter the names
     nuclei_names = nuclei_names[sorted_indices]
     
-    for harmonic in harmonics: # for each harmonic
+    # 5. Filter the simulated data for each harmonic
+    for harmonic in harmonics: 
         name = f'{harmonic}'
-        simulated_data_dict[name] = simulated_data_dict[name][sorted_indices]
+        if name in simulated_data_dict:
+            simulated_data_dict[name] = simulated_data_dict[name][sorted_indices]
 
 def save_simulation_results(mydata, mode, harmonics, sort_index, filename='simulation_result.out'):
     """

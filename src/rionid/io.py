@@ -1,6 +1,8 @@
-import numpy as np
-import ezodf
 import os
+
+import ezodf
+import numpy as np
+
 
 def read_tdsm_bin(path):
     """
@@ -19,27 +21,27 @@ def read_tdsm_bin(path):
     -------
     tuple
         (frequency_array, time_array, amplitude_matrix)
-    
+
     Raises
     ------
     Exception
         If files cannot be read or dimensions are inconsistent.
     """
     base_path, _ = os.path.splitext(path)
-    bin_fre_path = os.path.join(base_path + '.bin_fre')
-    bin_time_path = os.path.join(base_path + '.bin_time')
-    bin_amp_path = os.path.join(base_path + '.bin_amp')
+    bin_fre_path = os.path.join(base_path + ".bin_fre")
+    bin_time_path = os.path.join(base_path + ".bin_time")
+    bin_amp_path = os.path.join(base_path + ".bin_amp")
 
     try:
         fre = np.fromfile(bin_fre_path, dtype=np.float64)
         time = np.fromfile(bin_time_path, dtype=np.float32)
-        amp = np.memmap(bin_amp_path, dtype=np.float32, mode='r', shape=(len(time), len(fre)))
+        amp = np.memmap(bin_amp_path, dtype=np.float32, mode="r", shape=(len(time), len(fre)))
     except IOError as e:
         raise Exception(f"Error reading files: {e}")
-    
+
     if len(time) == 0 or len(fre) == 0:
         raise ValueError("Time or frequency data files are empty")
-    
+
     try:
         amp = amp.reshape((len(time), len(fre)))
     except ValueError as e:
@@ -50,6 +52,7 @@ def read_tdsm_bin(path):
     amplitude = np.concatenate((amp[:, midpoint:], amp[:, :midpoint]), axis=1)
 
     return frequency, time, amplitude
+
 
 def handle_read_tdsm_bin(path):
     """
@@ -69,7 +72,8 @@ def handle_read_tdsm_bin(path):
     amplitude_avg = np.average(amplitude, axis=0)
     return frequency, amplitude_avg
 
-def handle_spectrumnpz_data(filename, frequency_key='arr_0', amplitude_key='arr_1', **kwargs):
+
+def handle_spectrumnpz_data(filename, frequency_key="arr_0", amplitude_key="arr_1", **kwargs):
     """
     Handles simple 1D Spectrum NPZ files.
 
@@ -90,6 +94,7 @@ def handle_spectrumnpz_data(filename, frequency_key='arr_0', amplitude_key='arr_
     data = np.load(filename)
     return data[frequency_key].flatten(), data[amplitude_key]
 
+
 def read_psdata(filename, dbm=False):
     """
     Reads generic CSV/TXT spectrum files.
@@ -109,12 +114,13 @@ def read_psdata(filename, dbm=False):
     tuple
         (frequency_array, amplitude_array)
     """
-    if dbm: 
-        frequency, amplitude = np.genfromtxt(filename, skip_header=1, delimiter='|', usecols=(0,2))
-    else: 
-        frequency, amplitude = np.genfromtxt(filename, skip_header=1, delimiter='|', usecols=(0,1))
+    if dbm:
+        frequency, amplitude = np.genfromtxt(filename, skip_header=1, delimiter="|", usecols=(0, 2))
+    else:
+        frequency, amplitude = np.genfromtxt(filename, skip_header=1, delimiter="|", usecols=(0, 1))
 
     return frequency, amplitude
+
 
 def write_arrays_to_ods(file_name, sheet_name, names, *arrays):
     """
@@ -132,15 +138,15 @@ def write_arrays_to_ods(file_name, sheet_name, names, *arrays):
         Variable number of arrays to write as columns.
     """
     # Create the ods spreadsheet and add a sheet
-    spreadsheet = ezodf.newdoc(doctype='ods', filename=file_name)
+    spreadsheet = ezodf.newdoc(doctype="ods", filename=file_name)
     max_len = max(len(arr) for arr in arrays)
-    sheet = ezodf.Sheet(sheet_name, size=(max_len+1, len(arrays)))
+    sheet = ezodf.Sheet(sheet_name, size=(max_len + 1, len(arrays)))
     spreadsheet.sheets += sheet
-    
+
     for i, arr in enumerate(arrays):
         sheet[(0, i)].set_value(str(names[i]))
         for j in range(len(arr)):
-            sheet[j+1, i].set_value(arr[j])
+            sheet[j + 1, i].set_value(arr[j])
 
     # Save the spreadsheet
     spreadsheet.save()

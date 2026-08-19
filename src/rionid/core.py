@@ -1,18 +1,18 @@
-from numpy import polyval, array, stack, append, sqrt
-import sys
-import re
 import os
+import re
+import sys
+
 import numpy as np
-from scipy.signal import find_peaks, peak_widths
+from numpy import array, polyval, sqrt, stack
+from scipy.signal import find_peaks
 
-from rionid.masses import Ring, AMEData, get_ame_data, ionic_moq_u
 from rionid.external.lisereader.reader import LISEreader
-
 from rionid.io import (
-    read_psdata,
     handle_read_tdsm_bin,
     handle_spectrumnpz_data,
+    read_psdata,
 )
+from rionid.masses import AMEData, Ring, get_ame_data, ionic_moq_u
 
 
 class ImportData(object):
@@ -49,9 +49,20 @@ class ImportData(object):
         Extra parameters for file I/O (e.g., NPZ keys).
     """
 
-    def __init__(self, refion, alphap, filename=None, reload_data=None, circumference=None,
-                 highlight_ions=None, peak_threshold_pct=0.05, min_distance=10,
-                 matching_freq_min=None, matching_freq_max=None, io_params=None):
+    def __init__(
+        self,
+        refion,
+        alphap,
+        filename=None,
+        reload_data=None,
+        circumference=None,
+        highlight_ions=None,
+        peak_threshold_pct=0.05,
+        min_distance=10,
+        matching_freq_min=None,
+        matching_freq_max=None,
+        io_params=None,
+    ):
 
         self.simulated_data_dict = {}
         self.particles_to_simulate = []
@@ -59,16 +70,16 @@ class ImportData(object):
         self.protons = dict()
         self.total_mass = dict()
         self.yield_data = []
-        
+
         self.highlight_ions = self._parse_highlight_ions(highlight_ions)
         self.alphap = alphap
-        self.gammat = 1.0 / (self.alphap ** 0.5)
+        self.gammat = 1.0 / (self.alphap**0.5)
 
-        self.ring = Ring('ESR', circumference)
+        self.ring = Ring("ESR", circumference)
 
         self.ref_ion = refion.strip()
         self._parse_ref_ion(refion)
-        
+
         # Physics / Matching Params
         self.peak_threshold_pct = float(peak_threshold_pct) if peak_threshold_pct else 0.05
         self.min_distance = float(min_distance) if min_distance else 10
@@ -92,7 +103,7 @@ class ImportData(object):
                     self._load_experimental_data()
                 except (FileNotFoundError, IOError):
                     self._get_experimental_data(filename)
-            
+
             # --- Data processing: log-safety clip + normalise ---
             if self.experimental_data is not None:
                 freq, amp = self.experimental_data
@@ -114,11 +125,11 @@ class ImportData(object):
 
             # Process peaks after loading and processing
             self.detect_peaks_and_widths()
-    
+
     def _parse_ref_ion(self, refion):
         # Regex to extract Mass(Digits), Element(Letters), Charge(Digits)
         # It handles both '98Zr+39' and '98Zr39+' inputs
-        match = re.match(r'(\d+)([a-zA-Z]+).*?(\d+)', self.ref_ion)
+        match = re.match(r"(\d+)([a-zA-Z]+).*?(\d+)", self.ref_ion)
         if match:
             self.ref_aa = int(match.group(1))
             self.ref_el = match.group(2)
@@ -129,89 +140,96 @@ class ImportData(object):
             # Fallback parsing
             try:
                 # Try splitting by '+' if it exists in the middle
-                if '+' in refion and not refion.endswith('+'):
-                    parts = refion.split('+')
+                if "+" in refion and not refion.endswith("+"):
+                    parts = refion.split("+")
                     self.ref_charge = int(parts[1])
-                    self.ref_aa = int(re.split(r'(\d+)', parts[0])[1])
+                    self.ref_aa = int(re.split(r"(\d+)", parts[0])[1])
                 else:
                     # Assume format like 98Zr39+
-                    self.ref_charge = int(re.findall(r'\d+', refion)[-1])
-                    self.ref_aa = int(re.findall(r'\d+', refion)[0])
-            except:
+                    self.ref_charge = int(re.findall(r"\d+", refion)[-1])
+                    self.ref_aa = int(re.findall(r"\d+", refion)[0])
+            except Exception:
                 print(f"Warning: Could not parse reference ion '{refion}'.")
 
     def _parse_highlight_ions(self, input_str):
         """Parses a comma-separated string of ions into a list."""
-        if not input_str: return []
-        if isinstance(input_str, list): return input_str
-        return [x.strip() for x in input_str.split(',') if x.strip()]
+        if not input_str:
+            return []
+        if isinstance(input_str, list):
+            return input_str
+        return [x.strip() for x in input_str.split(",") if x.strip()]
 
     def _get_cache_file_path(self, filename):
         """Generates the cache filename."""
         base, _ = os.path.splitext(filename)
         return f"{base}_cache.npz"
-    
+
     def _get_experimental_data(self, filename):
         """Loads experimental data from various file formats."""
         base, file_extension = os.path.splitext(filename)
         ext = file_extension.lower()
 
-        if ext == '.csv':
+        if ext == ".csv":
             self.experimental_data = read_psdata(filename, dbm=False)
-        elif ext in ['.bin_fre', '.bin_time', '.bin_amp']:
+        elif ext in [".bin_fre", ".bin_time", ".bin_amp"]:
             self.experimental_data = handle_read_tdsm_bin(filename)
-        elif ext == '.npz':
+        elif ext == ".npz":
             self.experimental_data = handle_spectrumnpz_data(filename, **self.io_params)
-        elif ext == '.root':
-            raise ValueError("ROOT files are not supported in this version. Please convert to NPZ/CSV.")
+        elif ext == ".root":
+            raise ValueError(
+                "ROOT files are not supported in this version. Please convert to NPZ/CSV."
+            )
 
     def detect_peaks_and_widths(self):
         """
         Detects peaks in the experimental spectrum using scipy.signal.find_peaks.
-        
+
         Updates `self.peak_freqs` and `self.peak_heights`.
         """
-        if self.experimental_data is None: return
+        if self.experimental_data is None:
+            return
         freq, amp = self.experimental_data
-        
+
         rel_height = max(0.0, min(self.peak_threshold_pct, 1.0))
         height_thresh = np.max(amp) * rel_height
-        
+
         peaks, _ = find_peaks(
             amp,
             height=height_thresh,
             distance=self.min_distance,
             prominence=height_thresh * 0.2,
-            width=1
+            width=1,
         )
-        
+
         # Filter by frequency window
         peak_freqs = freq[peaks]
         mask = np.ones_like(peaks, dtype=bool)
         if self.matching_freq_min is not None:
-            mask &= (peak_freqs >= self.matching_freq_min)
+            mask &= peak_freqs >= self.matching_freq_min
         if self.matching_freq_max is not None:
-            mask &= (peak_freqs <= self.matching_freq_max)
-            
+            mask &= peak_freqs <= self.matching_freq_max
+
         self.peak_freqs = peak_freqs[mask]
         self.peak_heights = amp[peaks][mask]
-        self.peak_widths_freq = np.zeros_like(self.peak_freqs) 
+        self.peak_widths_freq = np.zeros_like(self.peak_freqs)
 
     def _save_experimental_data(self):
         """Caches loaded data to a compressed NPZ file."""
         if self.experimental_data is not None:
             frequency, amplitude_avg = self.experimental_data
-            np.savez_compressed(self.cache_file, frequency=frequency, amplitude_avg=amplitude_avg)                        
-            
+            np.savez_compressed(self.cache_file, frequency=frequency, amplitude_avg=amplitude_avg)
+
     def _load_experimental_data(self):
         """Loads data from the cache file."""
         if os.path.exists(self.cache_file):
             data = np.load(self.cache_file, allow_pickle=True)
-            frequency = data['frequency']
-            amplitude_avg = data['amplitude_avg']
+            frequency = data["frequency"]
+            amplitude_avg = data["amplitude_avg"]
             self.experimental_data = (frequency, amplitude_avg)
         else:
-            raise FileNotFoundError("Cached data file not found. Please set reload_data to True to generate it.")
+            raise FileNotFoundError(
+                "Cached data file not found. Please set reload_data to True to generate it."
+            )
 
     def _set_particles_to_simulate_from_file(self, particles_to_simulate):
         """Parses the LISE++ output file and loads the (process-cached)
@@ -235,7 +253,7 @@ class ImportData(object):
         self.total_mass = dict()
 
         for particle in self.particles_to_simulate:
-            ion_name = f'{particle[1]}{particle[0]}{particle[4][-1]}+'
+            ion_name = f"{particle[1]}{particle[0]}{particle[4][-1]}+"
             ame_row = self.ame.lookup(particle[0], particle[1])
             if ame_row is None:
                 continue
@@ -248,27 +266,35 @@ class ImportData(object):
     def _calculate_srrf(self, fref=None, brho=None, ke=None, gam=None, correct=None):
         """
         Calculates Simulated Relative Revolution Frequencies (SRRF).
-        
+
         Applies the slip factor formula and optional polynomial correction.
         """
         self.ref_mass = AMEData.to_mev(self.moq[self.ref_ion] * self.ref_charge)
         self.ref_frequency = self.reference_frequency(fref, brho, ke, gam)
-        self.srrf = array([1 - self.alphap * (self.moq[name] - self.moq[self.ref_ion]) / self.moq[self.ref_ion]
-                           for name in self.moq])
+        self.srrf = array(
+            [
+                1 - self.alphap * (self.moq[name] - self.moq[self.ref_ion]) / self.moq[self.ref_ion]
+                for name in self.moq
+            ]
+        )
         if correct:
             correction = polyval(array(correct), self.srrf * self.ref_frequency)
             self.srrf = self.srrf + correction / self.ref_frequency
 
-    def _simulated_data(self, brho=None, harmonics=None, mode=None, sim_scalingfactor=None, nions=None):
+    def _simulated_data(
+        self, brho=None, harmonics=None, mode=None, sim_scalingfactor=None, nions=None
+    ):
         """Generates the final simulation dictionary for plotting."""
         for harmonic in harmonics:
             ref_moq = self.moq[self.ref_ion]
-            if mode == 'brho':
+            if mode == "brho":
                 self.brho = brho
                 ref_frequency = self.ref_frequency * harmonic
             else:
                 ref_frequency = self.ref_frequency
-                self.brho = self.calculate_brho_relativistic(ref_moq, ref_frequency, self.ring.circumference, harmonic)
+                self.brho = self.calculate_brho_relativistic(
+                    ref_moq, ref_frequency, self.ring.circumference, harmonic
+                )
 
         self.simulated_data_dict = {}
         moq_keys = list(self.moq.keys())
@@ -292,48 +318,73 @@ class ImportData(object):
         max_yield = np.max(self.yield_data)
         if max_yield > 0:
             self.yield_data /= max_yield
-            
+
         if sim_scalingfactor:
             self.yield_data *= sim_scalingfactor
 
         for harmonic in harmonics:
             harmonic_freq = self.srrf * self.ref_frequency * harmonic
             arr_stack = stack((harmonic_freq, self.yield_data, self.nuclei_names), axis=1)
-            self.simulated_data_dict[f'{harmonic}'] = arr_stack
-    
+            self.simulated_data_dict[f"{harmonic}"] = arr_stack
+
     def calculate_brho_relativistic(self, moq, frequency, circumference, harmonic):
         """Calculates Magnetic Rigidity (Brho) from frequency."""
         actual_frequency = frequency / harmonic
         v = actual_frequency * circumference
         gamma = 1 / np.sqrt(1 - (v / AMEData.CC) ** 2)
-        p = moq * AMEData.UU * gamma * (v / AMEData.CC) 
-        brho = (p / AMEData.CC) * 1e6 
+        p = moq * AMEData.UU * gamma * (v / AMEData.CC)
+        brho = (p / AMEData.CC) * 1e6
         return brho
 
     def reference_frequency(self, fref=None, brho=None, ke=None, gam=None):
         """Determines the reference frequency based on input mode."""
-        if fref: return fref
-        elif brho: return ImportData.calc_ref_rev_frequency(self.ref_mass, self.ring.circumference, brho=brho, ref_charge=self.ref_charge)
-        elif ke: return ImportData.calc_ref_rev_frequency(self.ref_mass, self.ring.circumference, ke=ke, aa=self.ref_aa)
-        elif gam: return ImportData.calc_ref_rev_frequency(self.ref_mass, self.ring.circumference, gam=gam)
-        else: sys.exit('Error: No reference parameter provided.')
-            
+        if fref:
+            return fref
+        elif brho:
+            return ImportData.calc_ref_rev_frequency(
+                self.ref_mass, self.ring.circumference, brho=brho, ref_charge=self.ref_charge
+            )
+        elif ke:
+            return ImportData.calc_ref_rev_frequency(
+                self.ref_mass, self.ring.circumference, ke=ke, aa=self.ref_aa
+            )
+        elif gam:
+            return ImportData.calc_ref_rev_frequency(
+                self.ref_mass, self.ring.circumference, gam=gam
+            )
+        else:
+            sys.exit("Error: No reference parameter provided.")
+
     @staticmethod
-    def calc_ref_rev_frequency(ref_mass, ring_circumference, brho=None, ref_charge=None, ke=None, aa=None, gam=None):
+    def calc_ref_rev_frequency(
+        ref_mass, ring_circumference, brho=None, ref_charge=None, ke=None, aa=None, gam=None
+    ):
         """Static helper to calculate revolution frequency."""
-        if brho: gamma = ImportData.gamma_brho(brho, ref_charge, ref_mass)
-        elif ke: gamma = ImportData.gamma_ke(ke, aa, ref_mass)
-        elif gam: gamma = gam
+        if brho:
+            gamma = ImportData.gamma_brho(brho, ref_charge, ref_mass)
+        elif ke:
+            gamma = ImportData.gamma_ke(ke, aa, ref_mass)
+        elif gam:
+            gamma = gam
         beta = ImportData.beta(gamma)
         return ImportData.velocity(beta) / ring_circumference
 
     @staticmethod
-    def gamma_brho(brho, charge, mass): return sqrt(pow(brho * charge * AMEData.CC / (mass * 1e6), 2)+1)
+    def gamma_brho(brho, charge, mass):
+        return sqrt(pow(brho * charge * AMEData.CC / (mass * 1e6), 2) + 1)
+
     @staticmethod
-    def gamma_ke(ke, aa, ref_mass): return (ke * aa) / (ref_mass) + 1
+    def gamma_ke(ke, aa, ref_mass):
+        return (ke * aa) / (ref_mass) + 1
+
     @staticmethod
-    def beta(gamma): return sqrt(gamma**2 - 1) / gamma
+    def beta(gamma):
+        return sqrt(gamma**2 - 1) / gamma
+
     @staticmethod
-    def velocity(beta): return AMEData.CC * beta
+    def velocity(beta):
+        return AMEData.CC * beta
+
     @staticmethod
-    def calc_revolution_frequency(velocity, ring_circumference): return velocity / ring_circumference
+    def calc_revolution_frequency(velocity, ring_circumference):
+        return velocity / ring_circumference

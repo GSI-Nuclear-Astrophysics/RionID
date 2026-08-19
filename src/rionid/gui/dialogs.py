@@ -1,5 +1,5 @@
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QFormLayout, QHBoxLayout, 
-                             QPushButton, QComboBox)
+from PyQt5.QtWidgets import QComboBox, QDialog, QFormLayout, QPushButton, QVBoxLayout
+
 
 class KeySelectionDialog(QDialog):
     """
@@ -31,36 +31,36 @@ class KeySelectionDialog(QDialog):
         """
         super().__init__(parent)
         self.setWindowTitle("Select NPZ Keys")
-        
+
         # Ensure keys is a list
         keys = keys if keys is not None else []
 
         layout = QVBoxLayout()
         form = QFormLayout()
-        
+
         # Frequency Selection
         self.freq_combo = QComboBox()
         self.freq_combo.addItems(keys)
-        
+
         # Amplitude Selection
         self.amp_combo = QComboBox()
         self.amp_combo.addItems(keys)
-        
+
         # if 'arr_1' exists, set it as default for amplitude
         if len(keys) > 1:
             self.amp_combo.setCurrentIndex(1)
 
         form.addRow("Frequency Array:", self.freq_combo)
         form.addRow("Amplitude Array:", self.amp_combo)
-        
+
         # Buttons
         ok_btn = QPushButton("OK")
         ok_btn.clicked.connect(self.accept)
-        
+
         layout.addLayout(form)
         layout.addWidget(ok_btn)
         self.setLayout(layout)
-        
+
     def get_params(self):
         """
         Retrieves the user's selection after the dialog is accepted.
@@ -75,6 +75,6 @@ class KeySelectionDialog(QDialog):
             }
         """
         return {
-            'frequency_key': self.freq_combo.currentText(),
-            'amplitude_key': self.amp_combo.currentText()
+            "frequency_key": self.freq_combo.currentText(),
+            "amplitude_key": self.amp_combo.currentText(),
         }

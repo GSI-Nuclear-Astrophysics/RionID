@@ -11,10 +11,11 @@ holder. The physical constants and electron-binding-energy table
 docs/AUTOMATIC_PID_REMOVAL_MAP.md (decisions #1-2) and REFACTORING_PLAN.md
 for the extraction rationale.
 """
+
 import os
+import urllib.request as ur
 
 import fortranformat as ff
-import urllib.request as ur
 
 
 class Ring:
@@ -144,6 +145,7 @@ class AMEData:
     # second ionization energy:
     # AMEData.ElBiEn[4][4-1] - AMEData.ElBiEn[4][4-2]
 
+    # fmt: off
     ElBiEn = [
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -684,6 +686,7 @@ class AMEData:
          936124, 936995, 937832, 938614, 939363, 940079, 940759, 941406, 942022, 942475, 942905, 943284, 943641, 943947,
          944234, 944502, 944752, 945010, 945244, 945454, 945639, 945801, 945937, 946057, 946150, 946224, 946279, 946314,
          946337, 946349, 946354]]
+    # fmt: on
 
 
 _ame_cache = None

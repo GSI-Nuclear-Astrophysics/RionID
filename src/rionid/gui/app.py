@@ -1,12 +1,14 @@
-import sys
-from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QSplitter)
-from PyQt5.QtCore import Qt
 import logging as log
+import sys
+
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication, QSplitter, QVBoxLayout, QWidget
 
 from .inputs import RionID_GUI
 from .plot import CreatePyGUI
 
 log.basicConfig(level=log.DEBUG)
+
 
 class MainWindow(QWidget):
     """
@@ -30,16 +32,16 @@ class MainWindow(QWidget):
         """
         super().__init__()
         self.setWindowTitle("RionID")
-        
+
         screen = QApplication.primaryScreen()
         screen_geom = screen.availableGeometry()
         width = int(screen_geom.width() * 0.8)
         height = int(screen_geom.height() * 0.8)
-        
+
         # Center the window
         x = (screen_geom.width() - width) // 2
         y = (screen_geom.height() - height) // 2
-        self.setGeometry(x, y, width, height)   
+        self.setGeometry(x, y, width, height)
 
         # Create a QSplitter to hold both the input and the visualization
         splitter = QSplitter(Qt.Horizontal)
@@ -58,8 +60,8 @@ class MainWindow(QWidget):
         splitter.addWidget(self.visualization_widget)
 
         # Set initial size ratios (1 part input, 2 parts plot)
-        splitter.setStretchFactor(0, 1)  
-        splitter.setStretchFactor(1, 2) 
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 2)
 
         # Create the main layout
         layout = QVBoxLayout()
@@ -86,6 +88,7 @@ class MainWindow(QWidget):
         """
         self.visualization_widget.updateData(data)
 
+
 def main():
     """
     The main entry point for the RionID GUI application.
@@ -98,5 +101,6 @@ def main():
     main_window.show()
     sys.exit(app.exec_())
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

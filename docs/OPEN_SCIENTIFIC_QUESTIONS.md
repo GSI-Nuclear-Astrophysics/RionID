@@ -79,3 +79,75 @@ current implicit last-value behaviour. If it is supported, the per-row
 `fre` calculation likely needs the row's own harmonic, not the loop's last
 one — a semantic question for you, not a bug this document is claiming to
 have proven.
+
+## 5. `rionid.__main__.run_controller`'s CLI entry point requires `-psim`/`--filep` despite argparse marking it optional
+
+**Location:** `src/rionid/__main__.py`, `run_controller`.
+**Evidence:** `run_controller` unconditionally calls
+`ImportData._set_particles_to_simulate_from_file(particles_to_simulate)`
+regardless of whether `-psim`/`--filep` was supplied, and `argparse`'s own
+definition of `-psim` does not set `required=True`. Reproduced directly
+(found while writing `docs/REPRODUCIBILITY.md`, Task 10 of the JOSS-
+packaging plan): running `python3 -m rionid <any .npz> -r <ion> -ap <a>
+-f <freq> -hrm <h>` without `-psim` raises `TypeError: expected str,
+bytes or os.PathLike object, not NoneType` at
+`src/rionid/external/lisereader/reader.py`'s `open(filename,
+encoding="latin1")` — `LISEreader(None)` is constructed and immediately
+tries to open `None` as a path. No `.lpp` fixture exists anywhere in this
+repository, so this also cannot be reproduced end-to-end with a *working*
+candidate file from a clean checkout — only worked around via direct
+internal-API use (see `docs/REPRODUCIBILITY.md` §3).
+**Potential impact:** every CLI invocation that omits `-psim` — which
+argparse's own `--help` output implies is optional — crashes immediately
+with an unhelpful `TypeError` instead of either (a) actually working
+without a candidate list, or (b) a clear `argparse`-level error naming
+`-psim` as required. This affects the CLI entry point's basic usability,
+not any computed physics quantity: no code path here is capable of
+returning a *wrong* numeric result, because it doesn't run at all.
+**Proposed validation:** either mark `-psim`/`--filep` `required=True` in
+the CLI argument parser (an honest CLI-contract fix, no numerical change)
+or make `run_controller`/`_set_particles_to_simulate_from_file` handle
+`None` gracefully (e.g., skip candidate-list loading entirely, simulating
+only the reference ion) if that was ever meant to be a supported mode —
+which of the two is correct depends on a product decision this document
+isn't making.
+
+## 6. `rionid.__main__`'s CLI entry point never supplies a ring `circumference`, so every reference-frequency mode crashes
+
+**Location:** `src/rionid/__main__.py` (`main`/`run_controller`) and
+`src/rionid/core.py` (`ImportData.__init__`, `_simulated_data`,
+`calculate_brho_relativistic`).
+**Evidence:** `ImportData.__init__` defaults `circumference=None` and
+builds `self.ring = Ring("ESR", None)` when unset. `src/rionid/__main__.py`
+has no `--circumference` CLI flag at all, and `run_controller` calls
+`ImportData(ref_ion, alphap, filename=data_file)` without ever passing
+one. `_simulated_data`'s non-`"brho"`-mode branch — the branch every CLI
+run of `-f`/`-ke`/`-gam` takes, and even `-b` given the case mismatch
+below — unconditionally calls `self.calculate_brho_relativistic(ref_moq,
+ref_frequency, self.ring.circumference, harmonic)`, whose body computes
+`v = actual_frequency * circumference`: `float * None` raises `TypeError:
+unsupported operand type(s) for *: 'float' and 'NoneType'`. Reproduced
+directly via an isolated call and via the full CLI path (see
+`docs/REPRODUCIBILITY.md` §3's documented traceback; found alongside
+item 5 above while writing that document). Separately, `_simulated_data`'s
+branch check is `if mode == "brho":` (lowercase), while `__main__.py`/
+`gui/inputs.py` pass capitalized mode strings (`"Frequency"`, `"Brho"`,
+etc.) — so even explicit Brho-mode CLI runs take the same crashing
+branch; see item 4 above, which already names this same
+`save_simulation_results` case-mismatch pattern independently.
+**Potential impact:** every CLI-driven simulation run crashes before
+producing output, regardless of reference-frequency mode or arguments —
+a usability/entry-point defect, not a computed-value error (nothing here
+silently returns a wrong m/q, frequency, or yield; the run simply cannot
+complete). The GUI path (`gui/controller.py::import_controller`) does
+accept a `circumference` parameter from its own caller and is not
+necessarily affected the same way — this item is specific to the
+`python3 -m rionid` CLI entry point in `__main__.py`.
+**Proposed validation:** add a `--circumference` CLI flag (mirroring the
+GUI's own circumference input) and thread it through to `ImportData`,
+plus reconcile the `mode` string casing between `__main__.py`'s callers
+and `_simulated_data`/`save_simulation_results`'s checks (either
+normalize case on read, or standardize the string values used
+throughout). Both are CLI-usability/wiring fixes with no numerical
+ambiguity — but out of scope for the JOSS-packaging documentation work
+that discovered them.

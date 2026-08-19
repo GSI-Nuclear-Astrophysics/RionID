@@ -1330,6 +1330,110 @@ this repository.
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 ```
 
+- [ ] **Step 4 (addendum, added after Task 10): fix the Quick Start CLI
+      example now that it's confirmed broken**
+
+While writing Task 10 (`docs/REPRODUCIBILITY.md`), the implementer
+discovered — and the controller independently reproduced from a clean
+shell — that this task's own Quick Start CLI one-liner (`rionid
+datafile.npz -r 72Ge+32 -ap 0.189 -f 1930000 -hrm 127 -c 2.55e-7 -0.985
+9.5e5`) crashes immediately on any real invocation: `-psim` is
+unconditionally required by `rionid.__main__.run_controller` despite
+argparse not marking it required (no `.lpp` file is committed anywhere
+in this repo to supply one), and independently, `__main__.py` has no
+`--circumference` flag at all, so every reference-frequency mode
+crashes with `TypeError` regardless. Both are real, pre-existing bugs
+(confirmed via git history to predate this entire engagement), now
+logged as `docs/OPEN_SCIENTIFIC_QUESTIONS.md` items 5 and 6. Fixing them
+requires touching `src/rionid/`, which is out of scope for this
+documentation-only plan — so the fix here is to stop presenting a
+broken command as a working quick-start example, not to fix the
+underlying CLI.
+
+The GUI path is unaffected: `gui/inputs.py` has its own
+`circumference_edit` field wired through `import_controller` to
+`ImportData`, and file-selection dialogs for the candidate list — this
+bug is specific to the `python3 -m rionid`/`rionid <datafile>` CLI
+entry point in `__main__.py`, a separate code path from the GUI's
+`import_controller`.
+
+Replace this task's Quick Start section (in both `README.md` and
+`docs/index.md`) from:
+```markdown
+## Quick start
+
+```bash
+# Launch the GUI
+rionid
+
+# Or run a simulation directly from the terminal
+rionid datafile.npz -r 72Ge+32 -ap 0.189 -f 1930000 -hrm 127 -c 2.55e-7 -0.985 9.5e5
+```
+`datafile.npz` needs `arr_0`/`arr_1` keys (frequency, amplitude) by
+default, or any two array keys mapped via the GUI's key-selection dialog.
+See `docs/REPRODUCIBILITY.md` for a runnable example using synthetic data
+that needs no real experiment file at all.
+```
+to:
+```markdown
+## Quick start
+
+```bash
+rionid
+```
+Fill in a reference ion, momentum-compaction factor, exactly one
+reference-frequency value (frequency, Brho, kinetic energy, or gamma),
+a candidate list (LISE++ `.lpp` output), the ring circumference, and a
+spectrum file, then run the simulation from the window.
+
+`datafile.npz` needs `arr_0`/`arr_1` keys (frequency, amplitude) by
+default, or any two array keys mapped via the GUI's key-selection dialog.
+
+**A note on the `python3 -m rionid`/`rionid <datafile>` CLI path:** as
+currently implemented, this entry point requires a real LISE++
+candidate-list file via `-psim`/`--filep` (not optional in practice,
+despite argparse not marking it required) and has no way to supply a
+ring circumference at all — every reference-frequency mode currently
+crashes through this specific path. See
+`docs/OPEN_SCIENTIFIC_QUESTIONS.md` items 5-6 for the full evidence, and
+`docs/REPRODUCIBILITY.md` §3 for a verified, fully-working example that
+exercises the same underlying simulation engine directly, using only
+public/synthetic data.
+```
+
+- [ ] **Step 5 (addendum): verify and commit**
+
+```bash
+diff README.md docs/index.md
+grep -n "psim\|circumference" README.md
+```
+Expected: `diff` shows no output (files still identical); `grep` shows
+the new note's `-psim`/`--filep` and `circumference` mentions plus the
+pre-existing `## Arguments`/parameter-reference-table rows (unchanged).
+
+```bash
+git add README.md docs/index.md
+git commit -m "Fix README.md/docs/index.md Quick Start: stop showing a CLI command that crashes
+
+Task 10 (docs/REPRODUCIBILITY.md) discovered, and the controller
+independently reproduced, that this Quick Start's CLI one-liner cannot
+succeed through rionid.__main__ with any arguments: -psim is
+unconditionally required despite argparse not marking it so (no .lpp
+fixture exists in this repo), and independently, __main__.py has no
+--circumference flag at all, so every reference-frequency mode crashes.
+Both are real, pre-existing bugs unrelated to this documentation work --
+logged as docs/OPEN_SCIENTIFIC_QUESTIONS.md items 5-6, not fixed here
+(fixing needs src/rionid/ changes, out of scope for this plan).
+
+The GUI path is unaffected (gui/inputs.py wires its own circumference
+field through import_controller) and remains the Quick Start's primary
+example. The CLI note now honestly states the current limitation and
+points to docs/REPRODUCIBILITY.md's verified working alternative,
+instead of presenting a command that crashes on first use.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+```
+
 ---
 
 ### Task 9: `docs/SCIENTIFIC_METHOD.md`

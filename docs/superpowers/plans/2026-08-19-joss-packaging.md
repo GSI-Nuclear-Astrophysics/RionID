@@ -1373,7 +1373,7 @@ by the change in electron binding energy — manuscript §2.1, lines
 
 Known anchor lines often reveal a smooth, setting-dependent departure from
 the first-order model. RionID represents this as a residual — not an
-absolute frequency — correction (manuscript Eq. `rev_correction`, §2.2):
+absolute frequency — correction (manuscript Eq. `rev_correction`, §2.3):
 
 ```
 Δf(x) = A·x² + B·x + C,     x = f^(0)
@@ -1398,12 +1398,12 @@ configuration are not transferable to another without re-validation.
 ## 3. Harmonic projection
 
 A pickup near harmonic h observes `F_{i,h} = h · f_i` (manuscript Eq.
-`harmonic`, §2.1). RionID applies the correction once, in
+`harmonic`, §2.2). RionID applies the correction once, in
 revolution-frequency space, then multiplies by the requested harmonic(s) —
 `ImportData._simulated_data` (`src/rionid/core.py`). If you need to import
 a correction that was fitted directly in harmonic-frequency space at some
 harmonic h₁, the transform to revolution-frequency space (and to any other
-harmonic h₂) is given by manuscript Eq. `coefficient_transfer`, §2.3 — this
+harmonic h₂) is given by manuscript Eq. `coefficient_transfer`, §2.4 — this
 transform is a documentation/import convenience described in the
 manuscript; the software's own internal representation always stays in
 revolution-frequency space and never needs it at runtime.
@@ -1414,7 +1414,7 @@ Two things the manuscript discusses are explanatory/motivating, not
 computed features of the software:
 
 - **The harmonic-overlap criterion** (manuscript Eqs. `overlap_bounds`/
-  `overlap_count`, §2.1) explains *why* candidate generation must consider
+  `overlap_count`, §2.2) explains *why* candidate generation must consider
   a broad set of harmonics, not just the one nearest a pickup's nominal
   frequency — but RionID does not auto-derive which harmonics to display
   from this criterion. You supply the harmonic list explicitly (`-hrm`).

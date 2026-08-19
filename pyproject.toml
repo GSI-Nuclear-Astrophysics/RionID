@@ -1,14 +1,14 @@
-[tool.poetry]
+[project]
 name = "rionid"
-version = "8.0.0"
+version = "9.0.0"
 description = "Ring-stored ion IDentification: A pure Python tool for Schottky spectrum analysis."
-authors = ["David Freire-Fernández <D.FreireFernandez@gsi.de>"]
+authors = [
+    {name = "David Freire-Fernández", email = "D.FreireFernandez@gsi.de"},
+]
 license = "GPL-3.0-or-later"
 readme = "README.md"
-homepage = "https://gsi-nuclear-astrophysics.github.io/rionid/"
-repository = "https://github.com/GSI-Nuclear-Astrophysics/rionid"
+requires-python = ">=3.9,<3.13"
 keywords = ["Physics", "Nuclear Physics", "Storage Rings", "Mass Spectrometry", "Schottky"]
-
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
@@ -18,46 +18,50 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
+dependencies = [
+    "numpy>=2.0.2,<3",
+    "scipy>=1.10.1,<2",
+    "PyQt5>=5.15.9,<6",
+    "pyqtgraph>=0.13.3,<0.14",
+    "loguru>=0.7.0,<0.8",
+    "toml>=0.10.2,<0.11",
+    "ezodf>=0.3.2,<0.4",
+    "fortranformat>=2.0.3,<3",
+    "lxml>=6.0.2,<7",
+]
 
-# Recursively include everything in src/rionid
+[project.urls]
+Homepage = "https://gsi-nuclear-astrophysics.github.io/rionid/"
+Repository = "https://github.com/GSI-Nuclear-Astrophysics/rionid"
+"Bug Tracker" = "https://github.com/GSI-Nuclear-Astrophysics/rionid/issues"
+Documentation = "https://gsi-nuclear-astrophysics.github.io/rionid/"
+
+[project.scripts]
+rionid = "rionid.gui.app:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0,<9",
+    "pytest-qt>=4.2.0,<5",
+    "ruff>=0.6.0,<1",
+    "pyright>=1.1.380,<2",
+    "pre-commit>=3.8.0,<4",
+    "pip-audit>=2.7.0,<3",
+    "build>=1.2.0,<2",
+    "twine>=6.0.0,<7",
+]
+docs = [
+    "mkdocs>=1.5.0,<2",
+    "mkdocs-material>=9.5.0,<10",
+    "mkdocstrings[python]>=0.24.0,<0.25",
+    "mkdocs-gen-files>=0.5.0,<0.6",
+    "mkdocs-literate-nav>=0.6.0,<0.7",
+]
+
+[tool.poetry]
 packages = [
     { include = "rionid", from = "src" }
 ]
-
-[tool.poetry.urls]
-"Bug Tracker" = "https://github.com/GSI-Nuclear-Astrophysics/rionid/issues"
-"Documentation" = "https://gsi-nuclear-astrophysics.github.io/rionid/"
-"Source Code" = "https://github.com/GSI-Nuclear-Astrophysics/rionid"
-
-[tool.poetry.dependencies]
-python = ">=3.9,<3.13"
-numpy = "^2.0.2"
-scipy = "^1.10.1"
-PyQt5 = "^5.15.9"
-pyqtgraph = "^0.13.3"
-loguru = "^0.7.0"
-toml = "^0.10.2"
-ezodf = "^0.3.2"
-fortranformat = "^2.0.3"
-lxml = "^6.0.2"
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.0.0"
-pytest-qt = "^4.2.0"
-black = "^25.0.0"
-
-[tool.poetry.group.docs]
-optional = true
-[tool.poetry.group.docs.dependencies]
-# Documentation dependencies
-mkdocs = "^1.5.0"
-mkdocs-material = "^9.5.0"
-mkdocstrings = {extras = ["python"], version = "^0.24.0"}
-mkdocs-gen-files = "^0.5.0"
-mkdocs-literate-nav = "^0.6.0"
-
-[tool.poetry.scripts]
-rionid = "rionid.gui.app:main"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
@@ -67,6 +71,39 @@ markers = [
     "slow: larger-N performance/regression cases, not run by default",
 ]
 
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+# The verbatim-copied electron-binding-energy physics table (see
+# masses.py's module docstring) is intentionally many numbers per line --
+# do not reformat it for line length, that risks transcription damage to
+# physics reference data for zero benefit.
+"src/rionid/masses.py" = ["E501"]
+
+[tool.pyright]
+include = ["src"]
+pythonVersion = "3.9"
+typeCheckingMode = "basic"
+# Disabled: dominated by PyQt5/pyqtgraph stub-interop false positives
+# (Qt enum access patterns valid at runtime via SIP but not modeled by
+# the bundled stubs; pyqtgraph's dynamically-assigned attributes;
+# Optional-attribute narrowing pyright can't see across methods) rather
+# than real bugs -- confirmed during JOSS-packaging planning by manually
+# categorizing every one of the ~60 findings these rules produced.
+# reportPossiblyUnboundVariable stays enabled: it is what caught the
+# real, pre-existing issues now logged in docs/OPEN_SCIENTIFIC_QUESTIONS.md.
+reportOptionalMemberAccess = false
+reportOptionalIterable = false
+reportArgumentType = false
+reportAttributeAccessIssue = false
+reportCallIssue = false
+reportGeneralTypeIssues = false
+
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=1.7.0"]
 build-backend = "poetry.core.masonry.api"

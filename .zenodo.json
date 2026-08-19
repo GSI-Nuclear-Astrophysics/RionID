@@ -1,0 +1,20 @@
+{
+  "title": "RionID: Ring-stored ion IDentification",
+  "description": "A Python GUI application for expert-guided identification of stored highly charged ions in storage-ring Schottky spectra, via reference-anchored forward simulation and an empirical polynomial frequency correction.",
+  "creators": [
+    {"name": "Freire-Fernández, David", "orcid": "0000-0002-5898-9291"},
+    {"name": "Hudson-Chang, George", "orcid": "0000-0001-6404-6153"},
+    {"name": "Chen, Rui-Jiu", "orcid": "0000-0001-6283-8958"}
+  ],
+  "license": "GPL-3.0-or-later",
+  "upload_type": "software",
+  "access_right": "open",
+  "keywords": ["physics", "nuclear physics", "storage rings", "mass spectrometry", "Schottky spectroscopy"],
+  "related_identifiers": [
+    {
+      "identifier": "10.5281/zenodo.8169341",
+      "relation": "isVersionOf",
+      "resource_type": "software"
+    }
+  ]
+}

@@ -38,12 +38,12 @@ pyqtgraph = "^0.13.3"
 loguru = "^0.7.0"
 toml = "^0.10.2"
 ezodf = "^0.3.2"
-requests = "^2.31.0"        # Required for Barion to download mass tables
 fortranformat = "^2.0.3"
 lxml = "^6.0.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
+pytest-qt = "^4.2.0"
 black = "^25.0.0"
 
 [tool.poetry.group.docs]
@@ -58,6 +58,13 @@ mkdocs-literate-nav = "^0.6.0"
 
 [tool.poetry.scripts]
 rionid = "rionid.gui.app:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+markers = [
+    "slow: larger-N performance/regression cases, not run by default",
+]
 
 [build-system]
 requires = ["poetry-core"]

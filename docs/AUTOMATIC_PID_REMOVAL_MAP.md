@@ -24,7 +24,7 @@ all of which pass on the current branch.
 The manuscript (`RionID-EPJA/main.tex`) states throughout that RionID
 "separates calculation from scientific acceptance" and is explicitly **not**
 "an autonomous classifier" (abstract, conclusions). The shipped code
-currently violates that in exactly one self-contained feature, wired end to
+used to violate that in exactly one self-contained feature, wired end to
 end: the **"Quick PID"** GUI panel, which scans a grid of
 (reference frequency × α_p) values, computes a χ² match between simulated
 lines and detected experimental peaks for each grid point

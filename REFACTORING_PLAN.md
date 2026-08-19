@@ -95,7 +95,7 @@ src/rionid/
 | `io.py` | `io.py` (unchanged location) | `handle_tiqnpz_data`/`handle_prerionidnpz_data` **deleted** (removal-map decision #3, resolved). |
 | `baseline.py` | `analysis.py` (imported, not merged — BrPLS is a distinct, citable algorithm; keeping it in its own file is also acceptable and lower-diff) | **To decide during implementation**, not a physics question. |
 | `external/barion/particle.py: Particle.__init__` (zz/nn match), `get_ionic_mass_in_u`, `get_ionic_moq_in_u` | `masses.py` | Extracted verbatim (arithmetic unchanged, including the electron-binding correction). |
-| `external/barion/amedata.py: AMEData` table loader, `to_mev`/`to_u`/`to_kg`, `get_elbien`, `CC`/`UU`/`EE`/`ME` | `masses.py` | Extracted verbatim; this is the only part of `amedata.py` (837 lines) actually reachable from RionID (confirmed by call-graph in `LEGACY_BEHAVIOUR.md`). |
+| `external/barion/amedata.py: AMEData` table loader, `to_mev`/`to_u`, `get_elbien`, `CC`/`UU`/`EE`/`ME` | `masses.py` | Extracted verbatim; this is the only part of `amedata.py` (837 lines) actually reachable from RionID (confirmed by call-graph in `LEGACY_BEHAVIOUR.md`). |
 | `external/barion/ring.py: Ring` | `masses.py` (reduced to a circumference holder — `gamma_t`/`get_alpha_p()`/`get_ring_dict()` presets are unused by RionID, per `LEGACY_BEHAVIOUR.md`) | Extracted, trimmed. |
 | `external/barion/particle.py`: `identify_range`/`identify_search_range`/`identify_region`/`identify_search_region`/`get_unknown_moq_from_freq`/`get_unknown_rev_freq_from_moq`/`get_nuclides_freqs`/`get_all_in_all`/`get_isotopes`/`get_isotones`/`get_isobars` | **Deleted, not extracted** | Removal-map decision #1/#2, resolved — you are also an owner of `barion` upstream, so this is a scoping decision, not a vendoring risk. |
 | `external/barion/` (whole subpackage) | **Removed** | `pyproject.toml` loses the vendored-`barion` framing entirely; only `masses.py`'s extracted subset remains, as RionID's own code. |
@@ -170,3 +170,14 @@ src/rionid/
   (currently only in the paper) — same reason.
 - Any change to `_calculate_srrf`'s arithmetic, coefficient ordering, or
   units.
+- **The design spec's small `exceptions.py` error-handling hierarchy**
+  (converting bare `except Exception`/`sys.exit`/print-then-raise into typed
+  exceptions) was scoped for functions touched during Wave 2a but never
+  became a task and was never implemented — including the one in-scope
+  instance, `gui/controller.py`'s `import_controller` (edited in Task 6 for
+  an unrelated signature change), which still does
+  `print(...); raise e`. Deferred to Wave 2b: introducing one ad-hoc
+  exception type without the surrounding hierarchy would be premature, and
+  `print(...); raise e` is not a silent failure — it still propagates.
+  Found and ruled on during the final whole-branch review, not planned in
+  advance.

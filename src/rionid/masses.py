@@ -2,7 +2,7 @@
 
 Extracted from the vendored `barion` library (Xaratustrah, 2015-2016,
 GPL-3.0 -- you are also an upstream co-owner of that library) to keep only
-the subset RionID actually uses: AME2020/NUBASE2020 mass-table loading,
+the subset RionID actually uses: AME2020 mass-table loading,
 the ionic-mass electron-binding correction (RionID-EPJA/main.tex Sec. 2.1,
 the f^(0) model, lines 198-200), and a minimal storage-ring circumference
 holder. The physical constants and electron-binding-energy table
@@ -31,34 +31,31 @@ class Ring:
 
 
 class AMEData:
-    """Loads and caches the AME2020 mass table and NUBASE2020 table.
+    """Loads and caches the AME2020 mass table.
 
-    On construction, reads `~/.ame/ame.data` and `~/.ame/nubase.data`,
-    downloading them first if absent (network side effect, documented in
-    docs/LEGACY_BEHAVIOUR.md). Also builds an index for O(1) (element
-    name, mass number) lookup via `lookup()`, replacing the linear table
-    scan that was an O(N x table-size) hot spot -- see
-    docs/PERFORMANCE_BASELINE.md.
+    On construction, reads `~/.ame/ame.data`, downloading it first if
+    absent (network side effect, documented in docs/LEGACY_BEHAVIOUR.md).
+    Also builds an index for O(1) (element name, mass number) lookup via
+    `lookup()`, replacing the linear table scan that was an
+    O(N x table-size) hot spot -- see docs/PERFORMANCE_BASELINE.md.
     """
 
     AME_DATA_LINK = "https://www-nds.iaea.org/amdc/ame2020/mass_1.mas20.txt"
-    AME_NUTAB_LINK = "https://www-nds.iaea.org/amdc/ame2020/nubase_3.mas20.txt"
     FOLDER_NAME = "/.ame/"
 
     def __init__(self):
         self.home_folder = os.path.expanduser("~") + AMEData.FOLDER_NAME
         os.makedirs(self.home_folder, exist_ok=True)
         self.ame_table = []
-        self.nubase_table = []
         self.ame_data_filename = f"{self.home_folder}ame.data"
-        self.nubase_data_filename = f"{self.home_folder}nubase.data"
-        if not os.path.exists(self.ame_data_filename) or not os.path.exists(
-            self.nubase_data_filename
-        ):
+        if not os.path.exists(self.ame_data_filename):
             self._download()
         self._parse_ame()
-        self._parse_nubase()
-        self._index = {(row[6], row[5]): row for row in self.ame_table}
+        self._index = {}
+        for row in self.ame_table:
+            key = (row[6], row[5])
+            if key not in self._index:
+                self._index[key] = row
 
     def lookup(self, name, aa):
         """Returns the AME table row for (element name, mass number `aa`),
@@ -66,17 +63,12 @@ class AMEData:
         return self._index.get((name, aa))
 
     def _download(self):
-        """Downloads the AME2020/NUBASE2020 tables into `self.home_folder`.
+        """Downloads the AME2020 table into `self.home_folder`.
         Ported verbatim from
         `external/barion/amedata.py:AMEData.download_ame_data`."""
         req = ur.Request(AMEData.AME_DATA_LINK, headers={"User-Agent": "Magic Browser"})
         g = ur.urlopen(req)
         with open(self.home_folder + "ame.data", "b+w") as f:
-            f.write(g.read())
-
-        req = ur.Request(AMEData.AME_NUTAB_LINK, headers={"User-Agent": "Magic Browser"})
-        g = ur.urlopen(req)
-        with open(self.home_folder + "nubase.data", "b+w") as f:
             f.write(g.read())
 
     def _parse_ame(self):
@@ -104,21 +96,6 @@ class AMEData:
                         dataline[i] = dataline[i].strip()
                 self.ame_table.append(dataline)
 
-    def _parse_nubase(self):
-        """Parses the fixed-width NUBASE2020 table. Ported verbatim from
-        `external/barion/amedata.py:AMEData.init_nubase_db`."""
-        with open(self.nubase_data_filename) as f:
-            for _ in range(25):
-                next(f)
-            for line in f:
-                name = line[11:16].strip()
-                isomer = line[16:17].strip()
-                if isomer != "":
-                    continue
-                lt = line[69:77].strip()
-                mp = line[78:80].strip()
-                self.nubase_table.append([name, lt, AMEData.get_multiplier(mp)])
-
     @staticmethod
     def to_mev(m_u):
         return m_u * AMEData.UU
@@ -131,20 +108,6 @@ class AMEData:
     def get_elbien(zz, qq):
         return AMEData.ElBiEn[zz][zz - qq]
 
-    @staticmethod
-    def get_multiplier(mult):
-        """NUBASE half-life unit multiplier (seconds per unit). Ported
-        verbatim from `external/barion/amedata.py:AMEData.get_multiplier`."""
-        mult = mult.strip()
-        table = {
-            "": 0.0, "s": 1, "m": 60, "h": 3600, "d": 86400, "y": 31557600,
-            "ms": 1e-3, "us": 1e-6, "ns": 1e-9, "ps": 1e-12, "fs": 1e-15,
-            "as": 1e-18, "zs": 1e-21, "ys": 1e-24,
-            "ky": 31557600e3, "My": 31557600e6, "Gy": 31557600e9,
-            "Ty": 31557600e12, "Py": 31557600e15, "Ey": 31557600e18,
-            "Zy": 31557600e21, "Yy": 31557600e24,
-        }
-        return table.get(mult, 0.0)
     #
     # Table of electron binding energies. V.:09.09.2007 (YAL)
     # All energies are given in Ev.
@@ -729,8 +692,8 @@ _ame_cache = None
 def get_ame_data():
     """Returns a process-lifetime-cached `AMEData` instance.
 
-    The AME/NUBASE tables are immutable for the life of the process (they
-    only change if a user re-downloads them between runs), so re-parsing
+    The AME table is immutable for the life of the process (it
+    only changes if a user re-downloads it between runs), so re-parsing
     on every `ImportData` construction is wasted work -- see
     docs/PERFORMANCE_BASELINE.md, "AMEData() re-parses... on every
     ImportData construction".
@@ -754,7 +717,7 @@ def ionic_mass_u(ame_row, qq):
     change this arithmetic.
     """
     zz = ame_row[4]
-    atomic_mass_u = ame_row[15] + ame_row[16] / 1.0e6
+    atomic_mass_u = (ame_row[15] * 1.0e6 + ame_row[16]) / 1.0e6
     if zz > 100:
         return atomic_mass_u
     return atomic_mass_u + AMEData.to_u(

@@ -33,7 +33,9 @@ def build_ame_candidates(ame_table, n, zz_max=92):
     `particles_to_simulate`: `(element_name, aa, zz, nn, [charge_states],
     yield)`. Built from REAL rows of a loaded AME table (real Z/N/A/element
     name; fully-stripped charge state) -- only "which N to pick" and the
-    fixed yield=1.0 are synthetic, not the nuclide data itself.
+    per-candidate yield (a distinct synthetic value, 1.0, 2.0, ... in
+    table order, not a fixed constant) are synthetic, not the nuclide
+    data itself.
     """
     candidates = []
     seen = set()
@@ -45,7 +47,7 @@ def build_ame_candidates(ame_table, n, zz_max=92):
         if key in seen:
             continue
         seen.add(key)
-        candidates.append((name, aa, zz, nn, [zz], 1.0))
+        candidates.append((name, aa, zz, nn, [zz], float(len(candidates) + 1)))
         if len(candidates) >= n:
             break
     return candidates

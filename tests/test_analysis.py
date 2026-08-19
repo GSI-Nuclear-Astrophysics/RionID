@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from rionid.core import ImportData
-from rionid.masses import get_ame_data
+from rionid.masses import get_ame_data, ionic_moq_u
 from tests.fixtures.synthetic_spectrum import build_ame_candidates
 
 
@@ -33,24 +33,37 @@ def _make_model(ame_table, synthetic_spectrum_path, n):
 @pytest.mark.parametrize("n", [10, 100])
 def test_calculate_moqs_output(ame_table, synthetic_spectrum_path, n):
     model = _make_model(ame_table, synthetic_spectrum_path, n)
+    candidates = build_ame_candidates(ame_table, n)
     model._calculate_moqs()
 
     assert len(model.moq) == n
     assert set(model.moq.keys()) == set(model.total_mass.keys())
-    assert all(v > 0 for v in model.moq.values())
+    for name, aa, zz, nn, charges, yield_ in candidates:
+        qq = charges[-1]
+        ion_name = f"{aa}{name}{qq}+"
+        expected_moq = ionic_moq_u(model.ame.lookup(name, aa), qq)
+        assert model.moq[ion_name] == pytest.approx(expected_moq, rel=1e-15)
 
 
 @pytest.mark.parametrize("n", [10, 100])
 def test_simulated_data_yield_lookup_output(ame_table, synthetic_spectrum_path, n):
     model = _make_model(ame_table, synthetic_spectrum_path, n)
+    candidates = build_ame_candidates(ame_table, n)
+    expected_yield_by_ion = {
+        f"{aa}{name}{charges[-1]}+": yield_
+        for name, aa, zz, nn, charges, yield_ in candidates
+    }
     model._calculate_moqs()
     model._calculate_srrf(fref=1.93e6)
 
     model._simulated_data(harmonics=[127.0], mode="Frequency")
 
     assert len(model.yield_data) == n
-    # Every synthetic candidate carries yield=1.0 (build_ame_candidates).
-    assert np.all(np.asarray(model.yield_data) == 1.0)
+    moq_keys = list(model.moq.keys())
+    expected_yields = [expected_yield_by_ion[key] for key in moq_keys]
+    max_yield = max(expected_yields)
+    normalized_expected = [y / max_yield for y in expected_yields]
+    assert list(model.yield_data) == pytest.approx(normalized_expected, rel=1e-12)
     assert model.simulated_data_dict["127.0"].shape == (n, 3)
 
 
@@ -64,4 +77,4 @@ def test_simulated_data_yield_lookup_output_n2000(ame_table, synthetic_spectrum_
     model._calculate_srrf(fref=1.93e6)
     model._simulated_data(harmonics=[127.0], mode="Frequency")
     assert len(model.yield_data) == 2000
-    assert np.all(np.asarray(model.yield_data) == 1.0)
+    assert np.max(model.yield_data) == pytest.approx(1.0)

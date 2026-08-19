@@ -1,135 +1,100 @@
+"""Nuclide mass and mass-to-charge utilities.
+
+Extracted from the vendored `barion` library (Xaratustrah, 2015-2016,
+GPL-3.0 -- you are also an upstream co-owner of that library) to keep only
+the subset RionID actually uses: AME2020/NUBASE2020 mass-table loading,
+the ionic-mass electron-binding correction (RionID-EPJA/main.tex Sec. 2.1,
+the f^(0) model, lines 198-200), and a minimal storage-ring circumference
+holder. The physical constants and electron-binding-energy table
+(`AMEData.ElBiEn`) below are copied verbatim from
+`external/barion/amedata.py` and must not be hand-edited -- see
+docs/AUTOMATIC_PID_REMOVAL_MAP.md (decisions #1-2) and REFACTORING_PLAN.md
+for the extraction rationale.
 """
-Barion
-
--- GUI Application --
-
-Jul 2015 Xaratustrah
-Mar 2016 Xaratustrah
-Feb 2022 Xaratustrah
-
-"""
+import os
 
 import fortranformat as ff
 import urllib.request as ur
-import os
-import re
 
 
-class AMEData(object):
+class Ring:
+    """A storage ring, reduced to what RionID uses: name and circumference.
+
+    The upstream `barion.Ring` also carried `gamma_t`/`mag_rigidity`/
+    `acceptance`/per-facility presets (`get_ring_dict`) -- confirmed unused
+    by RionID in docs/LEGACY_BEHAVIOUR.md, dropped here.
     """
-    Class representing the AME Data
+
+    def __init__(self, name, circumference):
+        self.name = name
+        self.circumference = circumference
+
+
+class AMEData:
+    """Loads and caches the AME2020 mass table and NUBASE2020 table.
+
+    On construction, reads `~/.ame/ame.data` and `~/.ame/nubase.data`,
+    downloading them first if absent (network side effect, documented in
+    docs/LEGACY_BEHAVIOUR.md). Also builds an index for O(1) (element
+    name, mass number) lookup via `lookup()`, replacing the linear table
+    scan that was an O(N x table-size) hot spot -- see
+    docs/PERFORMANCE_BASELINE.md.
     """
-    # Constants
 
-    # AME2016
-    #AME_DATA_LINK = 'https://www-nds.iaea.org/amdc/ame2016/mass16.txt'
-    #AME_NUTAB_LINK = 'https://www-nds.iaea.org/amdc/ame2016/nubase2016.txt'
+    AME_DATA_LINK = "https://www-nds.iaea.org/amdc/ame2020/mass_1.mas20.txt"
+    AME_NUTAB_LINK = "https://www-nds.iaea.org/amdc/ame2020/nubase_3.mas20.txt"
+    FOLDER_NAME = "/.ame/"
 
-    # AME2020
-    AME_DATA_LINK = 'https://www-nds.iaea.org/amdc/ame2020/mass_1.mas20.txt'
-    AME_NUTAB_LINK = 'https://www-nds.iaea.org/amdc/ame2020/nubase_3.mas20.txt'
-
-    FOLDER_NAME = '/.ame/'
-
-    def __init__(self, ui_interface=None):
-        """
-        Constructor
-        :param ui_interface: An instance of the UI or the UI interface, this option is not required
-        :return:
-        """
-
-        # set home folders
-        self.home_folder = os.path.expanduser('~') + AMEData.FOLDER_NAME
-        self.make_folders()
-
-        self.ui_interface = ui_interface
+    def __init__(self):
+        self.home_folder = os.path.expanduser("~") + AMEData.FOLDER_NAME
+        os.makedirs(self.home_folder, exist_ok=True)
         self.ame_table = []
         self.nubase_table = []
+        self.ame_data_filename = f"{self.home_folder}ame.data"
+        self.nubase_data_filename = f"{self.home_folder}nubase.data"
+        if not os.path.exists(self.ame_data_filename) or not os.path.exists(
+            self.nubase_data_filename
+        ):
+            self._download()
+        self._parse_ame()
+        self._parse_nubase()
+        self._index = {(row[6], row[5]): row for row in self.ame_table}
 
-        self.ame_data_filename = '{}ame.data'.format(self.home_folder)
-        self.nubase_data_filename = '{}nubase.data'.format(self.home_folder)
-        self.check_for_database()
+    def lookup(self, name, aa):
+        """Returns the AME table row for (element name, mass number `aa`),
+        or `None` if not present in the table."""
+        return self._index.get((name, aa))
 
-        self.aa_max = 0
-        self.zz_max = 0
-        self.nn_max = 0
-        self.zz_names_dic = {}
-        self.aa_names_dic = {}
-        self.zz_nn_names_dic = {}
-        self.names_list = []
+    def _download(self):
+        """Downloads the AME2020/NUBASE2020 tables into `self.home_folder`.
+        Ported verbatim from
+        `external/barion/amedata.py:AMEData.download_ame_data`."""
+        req = ur.Request(AMEData.AME_DATA_LINK, headers={"User-Agent": "Magic Browser"})
+        g = ur.urlopen(req)
+        with open(self.home_folder + "ame.data", "b+w") as f:
+            f.write(g.read())
 
-        self.check_max_values()
+        req = ur.Request(AMEData.AME_NUTAB_LINK, headers={"User-Agent": "Magic Browser"})
+        g = ur.urlopen(req)
+        with open(self.home_folder + "nubase.data", "b+w") as f:
+            f.write(g.read())
 
-    def check_max_values(self):
-        """
-        Checks the maximum values of proton, neutron number available in the table
-        :return:
-        """
-        aa = [0]
-        nn = [0]
-        zz = [0]
-        for i in self.ame_table:
-            nn.append(i[3])
-            zz.append(i[4])
-            aa.append(i[5])
-            self.zz_names_dic[i[4]] = i[6]
-            self.aa_names_dic[i[5]] = i[6]
-            self.zz_nn_names_dic['{}_{}'.format(i[4], i[3])] = i[6]
-            if i[6] not in self.names_list:
-                self.names_list.append(i[6])
-
-        self.aa_max = max(aa)
-        self.nn_max = max(nn)
-        self.zz_max = max(zz)
-
-    def check_for_database(self):
-        """
-        Checks if database exists on user's home directory
-        :return:
-        """
-        if not os.path.exists(self.ame_data_filename) or not os.path.exists(self.nubase_data_filename):
-            if self.ui_interface:
-                response = self.ui_interface.show_message_box(
-                    'AME Database files do not exist. Download from AME website into {}?'.format(self.home_folder))
-                if response:
-                    self.download_ame_data()
-                    self.check_for_database()  # recursive call!
-                else:
-                    return
-            else:  # if no ui interface, just do it, don't ask
-                self.download_ame_data()
-                self.check_for_database()  # recursive call!
-
-        else:
-            if self.ui_interface:
-                self.ui_interface.show_message(
-                    'AME Database files are available.')
-            self.init_ame_db()
-            self.init_nubase_db()
-
-    def init_ame_db(self):
-        """
-        Read and initiate the database from file into memory
-        :return:
-        """
-        # here we add one more field "a4" at the beginning to determine experimental or systematic nuclei
-
-        # AME2016 reader
-        # ffline = ff.FortranRecordReader(
-        #    '(a4,a1,i3,i5,i5,i5,1x,a3,a4,1x,f13.5,f11.5,f11.3,f9.3,1x,a2,f11.3,f9.3,1x,i3,1x,f12.5,f11.5)')
-
-        # AME2020 reader
+    def _parse_ame(self):
+        """Parses the fixed-width AME2020 mass table. Ported verbatim from
+        `external/barion/amedata.py:AMEData.init_ame_db`; the FORTRAN
+        format string and 36-line header skip are the AME2020 file layout
+        and must not change without a new AME release."""
         ffline = ff.FortranRecordReader(
-            '(a4,a1,i3,i5,i5,i5,1x,a3,a4,1x,f14.6,f12.6,f13.5,1x,f10.5,1x,a2,f13.5,f11.5,1x,i3,1x,f13.6,f12.6)')
-
+            "(a4,a1,i3,i5,i5,i5,1x,a3,a4,1x,f14.6,f12.6,f13.5,1x,f10.5,1x,a2,f13.5,f11.5,1x,i3,1x,f13.6,f12.6)"
+        )
         with open(self.ame_data_filename) as f:
-            for _ in range(36):  # skip first 36 lines for AME2020, first 39 lines for AME2016
+            for _ in range(36):
                 next(f)
             for line in f:
-                if '*' in line:
-                    line = line.replace('*', '0')
-                if '#' in line:
-                    line = line.replace('#', '.')
+                if "*" in line:
+                    line = line.replace("*", "0")
+                if "#" in line:
+                    line = line.replace("#", ".")
                     line = "sys " + line
                 else:
                     line = "exp " + line
@@ -139,55 +104,24 @@ class AMEData(object):
                         dataline[i] = dataline[i].strip()
                 self.ame_table.append(dataline)
 
-    def init_nubase_db(self):
-        """
-        read and initiate the nubase from the file into memory
-        Returns
-        -------
-
-        """
+    def _parse_nubase(self):
+        """Parses the fixed-width NUBASE2020 table. Ported verbatim from
+        `external/barion/amedata.py:AMEData.init_nubase_db`."""
         with open(self.nubase_data_filename) as f:
-            for _ in range(25):  # skip first 25 lines for nubase2020, no lines for nubase2016
+            for _ in range(25):
                 next(f)
             for line in f:
                 name = line[11:16].strip()
                 isomer = line[16:17].strip()
-                if isomer != '':
+                if isomer != "":
                     continue
                 lt = line[69:77].strip()
                 mp = line[78:80].strip()
-                single = [name, lt, AMEData.get_multiplier(mp)]
-                self.nubase_table.append(single)
-
-    def download_ame_data(self):
-        """
-        Download the file from internet if not available locally
-        :return:
-        """
-        req = ur.Request(AMEData.AME_DATA_LINK, headers={
-            'User-Agent': "Magic Browser"})
-        g = ur.urlopen(req)
-
-#        g = ur.urlopen(AMEData.AME_DATA_LINK)
-        with open(self.home_folder + 'ame.data', 'b+w') as f:
-            f.write(g.read())
-
-        req = ur.Request(AMEData.AME_NUTAB_LINK, headers={
-            'User-Agent': "Magic Browser"})
-        g = ur.urlopen(req)
-        with open(self.home_folder + 'nubase.data', 'b+w') as f:
-            f.write(g.read())
-
-    # ------------------------------------
-    # static methods
+                self.nubase_table.append([name, lt, AMEData.get_multiplier(mp)])
 
     @staticmethod
     def to_mev(m_u):
         return m_u * AMEData.UU
-
-    @staticmethod
-    def to_kg(m_u):
-        return m_u * AMEData.UU * 1.0e6 * AMEData.EE / (AMEData.CC ** 2)
 
     @staticmethod
     def to_u(m_mev):
@@ -198,67 +132,19 @@ class AMEData(object):
         return AMEData.ElBiEn[zz][zz - qq]
 
     @staticmethod
-    def get_kmh(mps):
-        return mps * 18 / 5
-
-    @staticmethod
     def get_multiplier(mult):
+        """NUBASE half-life unit multiplier (seconds per unit). Ported
+        verbatim from `external/barion/amedata.py:AMEData.get_multiplier`."""
         mult = mult.strip()
-        result = 0.0
-        if mult == '':
-            result = 0.0
-        if mult == 's':
-            result = 1
-        if mult == 'm':
-            result = 60
-        if mult == 'h':
-            result = 3600
-        if mult == 'd':
-            result = 86400
-        if mult == 'y':
-            result = 31557600
-        if mult == 'ms':
-            result = 1e-3
-        if mult == 'us':
-            result = 1e-6
-        if mult == 'ns':
-            result = 1e-9
-        if mult == 'ps':
-            result = 1e-12
-        if mult == 'fs':
-            result = 1e-15
-        if mult == 'as':
-            result = 1e-18
-        if mult == 'zs':
-            result = 1e-21
-        if mult == 'ys':
-            result = 1e-24
-        if mult == 'ky':
-            result = 31557600e3
-        if mult == 'My':
-            result = 31557600e6
-        if mult == 'Gy':
-            result = 31557600e9
-        if mult == 'Ty':
-            result = 31557600e12
-        if mult == 'Py':
-            result = 31557600e15
-        if mult == 'Ey':
-            result = 31557600e18
-        if mult == 'Zy':
-            result = 31557600e21
-        if mult == 'Yy':
-            result = 31557600e24
-        return result
-
-    def make_folders(self):
-        """
-        Checks and makes missing folders in the user's home directory
-        :return:
-        """
-        if not os.path.exists(self.home_folder):
-            os.mkdir(self.home_folder)
-
+        table = {
+            "": 0.0, "s": 1, "m": 60, "h": 3600, "d": 86400, "y": 31557600,
+            "ms": 1e-3, "us": 1e-6, "ns": 1e-9, "ps": 1e-12, "fs": 1e-15,
+            "as": 1e-18, "zs": 1e-21, "ys": 1e-24,
+            "ky": 31557600e3, "My": 31557600e6, "Gy": 31557600e9,
+            "Ty": 31557600e12, "Py": 31557600e15, "Ey": 31557600e18,
+            "Zy": 31557600e21, "Yy": 31557600e24,
+        }
+        return table.get(mult, 0.0)
     #
     # Table of electron binding energies. V.:09.09.2007 (YAL)
     # All energies are given in Ev.
@@ -835,3 +721,47 @@ class AMEData(object):
          936124, 936995, 937832, 938614, 939363, 940079, 940759, 941406, 942022, 942475, 942905, 943284, 943641, 943947,
          944234, 944502, 944752, 945010, 945244, 945454, 945639, 945801, 945937, 946057, 946150, 946224, 946279, 946314,
          946337, 946349, 946354]]
+
+
+_ame_cache = None
+
+
+def get_ame_data():
+    """Returns a process-lifetime-cached `AMEData` instance.
+
+    The AME/NUBASE tables are immutable for the life of the process (they
+    only change if a user re-downloads them between runs), so re-parsing
+    on every `ImportData` construction is wasted work -- see
+    docs/PERFORMANCE_BASELINE.md, "AMEData() re-parses... on every
+    ImportData construction".
+    """
+    global _ame_cache
+    if _ame_cache is None:
+        _ame_cache = AMEData()
+    return _ame_cache
+
+
+def ionic_mass_u(ame_row, qq):
+    """Ionic mass in u for an ion in charge state `qq`, given its AME
+    table row.
+
+    Implements the manuscript's atomic-to-ionic mass correction
+    (RionID-EPJA/main.tex:198-200, Sec. 2.1): the ionic mass is the atomic
+    mass minus the removed electrons' rest mass, plus the corresponding
+    change in total electron binding energy divided by c^2. Ported
+    verbatim from
+    `external/barion/particle.py:Particle.get_ionic_mass_in_u` -- do not
+    change this arithmetic.
+    """
+    zz = ame_row[4]
+    atomic_mass_u = ame_row[15] + ame_row[16] / 1.0e6
+    if zz > 100:
+        return atomic_mass_u
+    return atomic_mass_u + AMEData.to_u(
+        (AMEData.get_elbien(zz, 0) - AMEData.get_elbien(zz, qq)) / 1.0e6 - qq * AMEData.ME
+    )
+
+
+def ionic_moq_u(ame_row, qq):
+    """Ionic mass-to-charge ratio in u, for an ion in charge state `qq`."""
+    return ionic_mass_u(ame_row, qq) / qq

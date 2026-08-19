@@ -6,9 +6,7 @@ import numpy as np
 import traceback
 from scipy.signal import find_peaks, peak_widths
 
-from rionid.external.barion.ring import Ring
-from rionid.external.barion.amedata import AMEData
-from rionid.external.barion.particle import Particle
+from rionid.masses import Ring, AMEData, get_ame_data, ionic_moq_u
 from rionid.external.lisereader.reader import LISEreader
 
 from rionid.io import (
@@ -311,35 +309,36 @@ class ImportData(object):
             raise FileNotFoundError("Cached data file not found. Please set reload_data to True to generate it.")
 
     def _set_particles_to_simulate_from_file(self, particles_to_simulate):
-        """Parses the LISE++ output file."""
-        self.ame = AMEData()
+        """Parses the LISE++ output file and loads the (process-cached)
+        AME table -- see rionid.masses.get_ame_data."""
+        self.ame = get_ame_data()
         self.ame_data = self.ame.ame_table
         lise = LISEreader(particles_to_simulate)
         self.particles_to_simulate = lise.get_info_all()
 
-    def _calculate_moqs(self, particles = None):
-        """Calculates mass-to-charge ratios for all particles."""
+    def _calculate_moqs(self):
+        """Calculates mass-to-charge ratios for every candidate in
+        self.particles_to_simulate, via an O(1) AME-table lookup (see
+        docs/PERFORMANCE_BASELINE.md; previously an
+        O(N x AME-table-size) linear scan per candidate). The `particles=`
+        parameter this method used to accept was dead code -- confirmed
+        by repo-wide grep that every call site (__main__.py,
+        gui/controller.py, gui/inputs.py) always calls it with no
+        arguments -- and has been removed.
+        """
         self.moq = dict()
         self.total_mass = dict()
-        
-        if particles:
-            for particle in particles:
-                ion_name = f'{particle.tbl_aa}{particle.tbl_name}{particle.qq}+'
-                m_q = particle.get_ionic_moq_in_u()
-                self.moq[ion_name] = m_q
-                self.total_mass[ion_name] = m_q * particle.qq
-        else:
-            for particle in self.particles_to_simulate:
-                ion_name = f'{particle[1]}{particle[0]}{particle[4][-1]}+'
-                for ame in self.ame_data:
-                    if particle[0] == ame[6] and particle[1] == ame[5]:
-                        pp = Particle(particle[2], particle[3], self.ame, self.ring)
-                        pp.qq = particle[4][-1]
-                        m_q = pp.get_ionic_moq_in_u()
-                        self.moq[ion_name] = m_q
-                        self.total_mass[ion_name] = m_q * pp.qq
-                        self.protons[ion_name] = ame[4]
-                        break
+
+        for particle in self.particles_to_simulate:
+            ion_name = f'{particle[1]}{particle[0]}{particle[4][-1]}+'
+            ame_row = self.ame.lookup(particle[0], particle[1])
+            if ame_row is None:
+                continue
+            qq = particle[4][-1]
+            m_q = ionic_moq_u(ame_row, qq)
+            self.moq[ion_name] = m_q
+            self.total_mass[ion_name] = m_q * qq
+            self.protons[ion_name] = ame_row[4]
 
     def _calculate_srrf(self, fref=None, brho=None, ke=None, gam=None, correct=None):
         """

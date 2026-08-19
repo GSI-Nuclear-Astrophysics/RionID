@@ -15,7 +15,7 @@
 *   **Pure Python:** No ROOT dependencies required.
 *   **Automated Matching:** Includes Quick PID logic to scan $\alpha_p$ and Reference Frequency to find the best match ($\chi^2$ minimization).
 *   **Signal Processing:** Built-in baseline subtraction (BrPLS) and peak detection.
-*   **Standalone:** Bundles `barion` and `lisereader` (GPL-3.0) for easy installation without complex dependency management.
+*   **Standalone:** Bundles `lisereader` (GPL-3.0) for easy installation without complex dependency management.
 
 ## Installation
 

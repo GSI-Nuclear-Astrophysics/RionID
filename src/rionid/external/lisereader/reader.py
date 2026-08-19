@@ -1,11 +1,18 @@
 import numpy as np
-from rionid.external.barion.amedata import AMEData
+from rionid.masses import get_ame_data
 from re import sub
 
 class LISEreader:
     def __init__(self, filename):
-        ame = AMEData()
-        ame.init_ame_db
+        # NOTE: previously constructed its own independent AMEData(),
+        # re-parsing the mass table a SECOND time on top of core.py's own
+        # load (docs/PERFORMANCE_BASELINE.md underestimated this -- the
+        # real per-run AME-parse cost was ~2x the measured ~168ms). Now
+        # shares the process-lifetime cache. The prior `ame.init_ame_db`
+        # line (no parentheses) was a no-op that never actually called
+        # the method -- dropped, since AMEData's own __init__ already
+        # parses both tables.
+        ame = get_ame_data()
         self.ame_data = ame.ame_table
         self._read(filename)
 

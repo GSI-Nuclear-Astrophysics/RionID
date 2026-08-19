@@ -128,13 +128,12 @@ ref_frequency, self.ring.circumference, harmonic)`, whose body computes
 `v = actual_frequency * circumference`: `float * None` raises `TypeError:
 unsupported operand type(s) for *: 'float' and 'NoneType'`. Reproduced
 directly via an isolated call and via the full CLI path (see
-`docs/REPRODUCIBILITY.md` §3's documented traceback; found alongside
+`docs/REPRODUCIBILITY.md` §3's documented exception text; found alongside
 item 5 above while writing that document). Separately, `_simulated_data`'s
 branch check is `if mode == "brho":` (lowercase), while `__main__.py`/
 `gui/inputs.py` pass capitalized mode strings (`"Frequency"`, `"Brho"`,
 etc.) — so even explicit Brho-mode CLI runs take the same crashing
-branch; see item 4 above, which already names this same
-`save_simulation_results` case-mismatch pattern independently.
+branch.
 **Potential impact:** every CLI-driven simulation run crashes before
 producing output, regardless of reference-frequency mode or arguments —
 a usability/entry-point defect, not a computed-value error (nothing here

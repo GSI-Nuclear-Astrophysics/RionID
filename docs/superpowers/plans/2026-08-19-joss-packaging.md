@@ -2064,7 +2064,7 @@ whole repo. All must exist/pass before writing Step 2's claims about them.
 An honest, evidence-based check against JOSS's actual review criteria
 (https://joss.readthedocs.io/en/latest/review_criteria.html) as of this
 writing. This document states what is in place and what is not — it does
-not claim submission-ready status, since two concrete pending actions
+not claim submission-ready status, since four concrete pending actions
 (below) remain outside this repository's control.
 
 ## In place
@@ -2117,12 +2117,12 @@ not claim submission-ready status, since two concrete pending actions
   and no `--circumference` flag exists at all, so every reference-
   frequency mode crashes. Neither is fixed in this packaging work (fixing
   requires changing `src/rionid/`, out of scope for a documentation-only
-  plan); both are documented with exact tracebacks in
-  `docs/OPEN_SCIENTIFIC_QUESTIONS.md` items 5-6. The GUI path is
+  plan); both are documented with the exact exception text and file
+  provenance in `docs/OPEN_SCIENTIFIC_QUESTIONS.md` items 5-6. The GUI path is
   unaffected. `examples/quickstart.py` and `docs/REPRODUCIBILITY.md` §3
   both route around this by driving the underlying simulation engine
   directly rather than through the broken CLI path — this is why
-  "Example usage" above is still checked ✅ above: the shipped examples
+  "Example usage" is still checked ✅ above: the shipped examples
   genuinely work, even though the raw CLI does not.
 
 ## Explicitly not claimed

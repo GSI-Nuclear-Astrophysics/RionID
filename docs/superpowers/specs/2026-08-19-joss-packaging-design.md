@@ -202,7 +202,9 @@ benchmark, or "submission-ready" status claims.
 
 - [ ] `pip install -e ".[dev]"` works in a fresh venv in this sandbox.
 - [ ] `python -m build && twine check dist/*` passes.
-- [ ] `ruff check .` and `ruff format --check .` pass repo-wide.
+- [ ] `ruff check src/` and `ruff format --check src/` pass (scoped to
+      `src/`, matching exactly what was cleaned -- see the plan's Task 5
+      amendment for the full rationale).
 - [ ] `pyright` runs and passes in basic mode (no genuine errors).
 - [ ] `pytest` (the existing 19-test suite) still passes unmodified —
       this sub-project does not touch `tests/` or any file `tests/`

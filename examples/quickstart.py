@@ -3,15 +3,16 @@ data -- no real spectrum or candidate file needed.
 
 Run with: python examples/quickstart.py
 """
+
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from tests.fixtures.synthetic_spectrum import make_synthetic_spectrum
 from rionid.core import ImportData
 from rionid.masses import get_ame_data, ionic_moq_u
+from tests.fixtures.synthetic_spectrum import make_synthetic_spectrum
 
 
 def main():
@@ -23,13 +24,16 @@ def main():
     # worked example (RionID-EPJA/main.tex). A single candidate equal to
     # the reference ion isolates this demo to the frequency model and
     # correction step, without needing a LISE++ candidate file -- see
-    # docs/REPRODUCIBILITY.md for a full CLI example with -psim.
+    # docs/REPRODUCIBILITY.md Section 3 for a full engine-driven example
+    # with a real AME2020 candidate list (the CLI's -psim path currently
+    # has known issues -- see docs/OPEN_SCIENTIFIC_QUESTIONS.md items 5-6).
     ref_ion = "72Ge32+"
     ame_row = get_ame_data().lookup("Ge", 72)
     ref_moq = ionic_moq_u(ame_row, 32)
 
-    model = ImportData(ref_ion, alphap=0.189, filename=spectrum_path,
-                        reload_data=True, circumference=108.36)
+    model = ImportData(
+        ref_ion, alphap=0.189, filename=spectrum_path, reload_data=True, circumference=108.36
+    )
     model.moq = {ref_ion: ref_moq}
     model.ref_ion = ref_ion
     model.ref_charge = 32
@@ -38,8 +42,10 @@ def main():
     print(f"Reference ion {ref_ion}: m/q = {ref_moq} u")
     print(f"Reference frequency: {model.ref_frequency} Hz")
     print(f"srrf (relative revolution frequency): {model.srrf}")
-    print("For a full simulation with a real candidate list and CLI/GUI "
-          "usage, see docs/REPRODUCIBILITY.md.")
+    print(
+        "For a full simulation with a real candidate list and CLI/GUI "
+        "usage, see docs/REPRODUCIBILITY.md."
+    )
 
 
 if __name__ == "__main__":

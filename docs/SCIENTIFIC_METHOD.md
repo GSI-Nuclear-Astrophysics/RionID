@@ -4,7 +4,9 @@ This is a reader-facing summary of the physics RionID implements and where
 it lives in the code — written for a storage-ring scientist who wants to
 use or verify the software, not as an implementation audit (that's
 `docs/PUBLICATION_TRACEABILITY.md`). It cross-references the accompanying
-EPJ A manuscript (`RionID-EPJA/main.tex`) by section and equation.
+EPJ A manuscript (`RionID-EPJA/main.tex` — a companion work not
+distributed in this repository; see `docs/PUBLICATION_TRACEABILITY.md`)
+by section and equation.
 
 ## 1. Reference-anchored forward model
 

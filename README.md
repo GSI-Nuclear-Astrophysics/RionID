@@ -51,6 +51,11 @@ functionality that was deliberately removed from this release.
 ```bash
 pip install rionid
 ```
+As of this writing, PyPI serves the pre-9.0.0 release line (the most
+recent published version does not yet include this release's removals
+of automatic ion identification and baseline subtraction — see the
+"Scope and non-goals" section above). Install from source below for the
+current `9.0.0` behavior until a 9.0.0 release is published.
 
 ### From source (development)
 
@@ -154,8 +159,9 @@ and the one recorded in `CITATION.cff` — see
 - This release performs no automatic or autonomous species assignment —
   see "Scope and non-goals" above.
 
-See `RionID-EPJA/main.tex` (the accompanying physics/methods manuscript)
-for the full validation discussion.
+See `RionID-EPJA/main.tex` (the accompanying physics/methods manuscript,
+a companion work not distributed in this repository — see
+`docs/PUBLICATION_TRACEABILITY.md`) for the full validation discussion.
 
 ## Acknowledgements
 

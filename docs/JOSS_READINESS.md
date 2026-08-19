@@ -3,7 +3,7 @@
 An honest, evidence-based check against JOSS's actual review criteria
 (https://joss.readthedocs.io/en/latest/review_criteria.html) as of this
 writing. This document states what is in place and what is not — it does
-not claim submission-ready status, since two concrete pending actions
+not claim submission-ready status, since four concrete pending actions
 (below) remain outside this repository's control.
 
 ## In place
@@ -12,7 +12,7 @@ not claim submission-ready status, since two concrete pending actions
 |---|---|---|
 | Open source license | ✅ | GPL-3.0-or-later, OSI-approved (`LICENSE`) |
 | Repository | ✅ | Public GitHub repository with version control history |
-| Research application | ✅ | Storage-ring ion identification for nuclear/atomic physics; accompanying EPJ A manuscript (`RionID-EPJA/main.tex`) describes the method and an experimental application |
+| Research application | ✅ | Storage-ring ion identification for nuclear/atomic physics; accompanying EPJ A manuscript (`RionID-EPJA/main.tex`, a companion work not distributed in this repository — see `docs/PUBLICATION_TRACEABILITY.md`) describes the method and an experimental application |
 | Installation instructions | ✅ | `README.md` (PyPI and source), verified to actually work (`pip install -e ".[dev]"`, live-tested) |
 | Example usage | ✅ | `examples/quickstart.py`, `docs/REPRODUCIBILITY.md` — both use synthetic data, no restricted inputs needed |
 | Functionality documentation | ✅ | `README.md` parameter reference, `docs/SCIENTIFIC_METHOD.md`, `docs/LEGACY_BEHAVIOUR.md`, mkdocs API docs via mkdocstrings |
@@ -56,12 +56,12 @@ not claim submission-ready status, since two concrete pending actions
   and no `--circumference` flag exists at all, so every reference-
   frequency mode crashes. Neither is fixed in this packaging work (fixing
   requires changing `src/rionid/`, out of scope for a documentation-only
-  plan); both are documented with exact tracebacks in
-  `docs/OPEN_SCIENTIFIC_QUESTIONS.md` items 5-6. The GUI path is
+  plan); both are documented with the exact exception text and file
+  provenance in `docs/OPEN_SCIENTIFIC_QUESTIONS.md` items 5-6. The GUI path is
   unaffected. `examples/quickstart.py` and `docs/REPRODUCIBILITY.md` §3
   both route around this by driving the underlying simulation engine
   directly rather than through the broken CLI path — this is why
-  "Example usage" above is still checked ✅ above: the shipped examples
+  "Example usage" is still checked ✅ above: the shipped examples
   genuinely work, even though the raw CLI does not.
 
 ## Explicitly not claimed

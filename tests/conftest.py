@@ -7,6 +7,12 @@ import sys
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+# Preload PyQt5 to prevent pytestqt from trying to detect PySide6
+try:
+    from PyQt5.QtCore import QCoreApplication  # noqa: F401
+except Exception:
+    pass
+
 import pytest  # noqa: E402
 
 

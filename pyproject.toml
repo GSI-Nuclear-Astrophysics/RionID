@@ -60,6 +60,7 @@ mkdocs-literate-nav = "^0.6.0"
 rionid = "rionid.gui.app:main"
 
 [tool.pytest.ini_options]
+pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "--strict-markers"
 markers = [

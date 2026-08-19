@@ -48,12 +48,21 @@ black = "^25.0.0"
 Add a new section anywhere after `[tool.poetry.scripts]`:
 ```toml
 [tool.pytest.ini_options]
+pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "--strict-markers"
 markers = [
     "slow: larger-N performance/regression cases, not run by default",
 ]
 ```
+**`pythonpath = ["src"]` is load-bearing, not optional**: this environment
+has a stale, unrelated `rionid==1.0.0` package already installed in
+site-packages (see `docs/LEGACY_BEHAVIOUR.md`'s "Environment note"). Without
+this line, plain `pytest`/`python3 -m pytest` silently resolves `import
+rionid` in every test file to that stale global package instead of this
+repo's `src/rionid` — producing wrong results that look like a physics bug
+but aren't. (Found and fixed during Task 3's execution, not the original
+design pass — see the ledger.)
 
 - [ ] **Step 2: Install `pytest-qt` locally for this checkout**
 

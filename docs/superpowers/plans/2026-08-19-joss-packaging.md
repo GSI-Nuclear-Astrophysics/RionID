@@ -2107,6 +2107,24 @@ not claim submission-ready status, since two concrete pending actions
 - **JOSS submission itself has not occurred.** This document supports a
   future submission decision; it does not assert one has been made.
 
+## Known limitations (documented, not fixed)
+
+- **The `python3 -m rionid`/`rionid <datafile>` CLI entry point cannot
+  currently complete a simulation run with any arguments.** Two
+  independent, pre-existing bugs — discovered while writing
+  `docs/REPRODUCIBILITY.md` and independently reproduced — mean `-psim`
+  is effectively mandatory despite `argparse` not marking it required,
+  and no `--circumference` flag exists at all, so every reference-
+  frequency mode crashes. Neither is fixed in this packaging work (fixing
+  requires changing `src/rionid/`, out of scope for a documentation-only
+  plan); both are documented with exact tracebacks in
+  `docs/OPEN_SCIENTIFIC_QUESTIONS.md` items 5-6. The GUI path is
+  unaffected. `examples/quickstart.py` and `docs/REPRODUCIBILITY.md` §3
+  both route around this by driving the underlying simulation engine
+  directly rather than through the broken CLI path — this is why
+  "Example usage" above is still checked ✅ above: the shipped examples
+  genuinely work, even though the raw CLI does not.
+
 ## Explicitly not claimed
 
 This document does not claim: any adoption/usage statistics, any

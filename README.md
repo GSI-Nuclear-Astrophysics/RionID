@@ -13,7 +13,7 @@
 
 ## Features
 *   **Pure Python:** No ROOT dependencies required.
-*   **Signal Processing:** Built-in baseline subtraction (BrPLS) and peak detection.
+*   **Signal Processing:** Peak detection with configurable threshold and minimum distance.
 *   **Standalone:** Bundles `lisereader` (GPL-3.0) for easy installation without complex dependency management.
 
 ## Installation
@@ -59,8 +59,6 @@ rionid datafile.npz -f 11.2452 -r 209Bi+83 -psim fragments.lpp -b 5.5
 *   `-hrm`: Harmonics to simulate.
 *   `-b`, `--brho`: Magnetic rigidity (Brho) [Tm].
 *   `-f`, `--fref`: Revolution frequency [Hz].
-*   `--remove_baseline`: Apply baseline subtraction.
-*   `--peak_threshold_pct`: Peak detection threshold (0.0 - 1.0).
 
 ## Acknowledgements
 *   **Dr. RuiJiu Chen** for providing the C++ Time-of-Flight simulation code that inspired the backbone of this software.

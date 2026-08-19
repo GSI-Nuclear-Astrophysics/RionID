@@ -3,7 +3,6 @@ import sys
 import re
 import os
 import numpy as np
-import traceback
 from scipy.signal import find_peaks, peak_widths
 
 from rionid.masses import Ring, AMEData, get_ame_data, ionic_moq_u
@@ -15,7 +14,6 @@ from rionid.io import (
     handle_spectrumnpz_data, # probably I will just keep this option, delete the others
     handle_tiqnpz_data
 )
-from rionid.baseline import NONPARAMS_EST
 
 
 class ImportData(object):
@@ -40,10 +38,6 @@ class ImportData(object):
         Ring circumference in meters.
     highlight_ions : str or list, optional
         Ions to highlight in the plot.
-    remove_baseline : bool, optional
-        Whether to apply baseline subtraction.
-    psd_baseline_removed_l : float, optional
-        Smoothness parameter for baseline removal.
     peak_threshold_pct : float, optional
         Peak detection threshold (0.0-1.0).
     min_distance : float, optional
@@ -57,9 +51,8 @@ class ImportData(object):
     """
 
     def __init__(self, refion, alphap, filename=None, reload_data=None, circumference=None,
-                 highlight_ions=None, remove_baseline=False, psd_baseline_removed_l=1e6,
-                 peak_threshold_pct=0.05, min_distance=10, matching_freq_min=None, 
-                 matching_freq_max=None, io_params=None):
+                 highlight_ions=None, peak_threshold_pct=0.05, min_distance=10,
+                 matching_freq_min=None, matching_freq_max=None, io_params=None):
 
         self.simulated_data_dict = {}
         self.particles_to_simulate = []
@@ -82,9 +75,7 @@ class ImportData(object):
         self.min_distance = float(min_distance) if min_distance else 10
         self.matching_freq_min = matching_freq_min
         self.matching_freq_max = matching_freq_max
-        self.remove_baseline = remove_baseline
-        self.psd_baseline_removed_l = psd_baseline_removed_l
-        self.io_params = io_params or {} 
+        self.io_params = io_params or {}
 
         # Results containers
         self.peak_freqs = []
@@ -103,34 +94,24 @@ class ImportData(object):
                 except (FileNotFoundError, IOError):
                     self._get_experimental_data(filename)
             
-            # --- NEW DATA PROCESSING BLOCK ---
+            # --- Data processing: log-safety clip + normalise ---
             if self.experimental_data is not None:
                 freq, amp = self.experimental_data
-                
-                # 1. Baseline Removal
-                if remove_baseline:
-                    try:
-                        est = NONPARAMS_EST(amp)
-                        baseline = est.pls('BrPLS', l=psd_baseline_removed_l, ratio=1e-6)
-                        amp = amp - baseline
-                    except Exception as e:
-                        print(f"Baseline removal failed: {e}")
-                        traceback.print_exc()
 
-                # 2. Log-Safety (Clip negatives)
-                # Ensure all values are > 0 for logarithmic plotting. 
-                # We use 1e-9 as a "floor" value.
+                # Log-Safety (Clip negatives): ensure all values are > 0
+                # for logarithmic plotting. NOTE: the floor here (1e-29)
+                # intentionally does not match gui/plot.py's separate
+                # 1e-9 floor for the same purpose -- pre-existing,
+                # unchanged, logged in docs/LEGACY_BEHAVIOUR.md, not
+                # fixed as part of this removal.
                 amp = np.maximum(amp, 1e-29)
 
-                # 3. Normalization
-                # Scale so the highest peak is 1.0
+                # Normalization: scale so the highest peak is 1.0
                 max_val = np.max(amp)
                 if max_val > 0:
                     amp = amp / max_val
-                
-                # Update the stored data
+
                 self.experimental_data = (freq, amp)
-            # ---------------------------------
 
             # Process peaks after loading and processing
             self.detect_peaks_and_widths()
@@ -188,16 +169,6 @@ class ImportData(object):
             #    self.experimental_data = handle_tiqnpz_data(filename, **self.io_params)
         elif ext == '.root':
             raise ValueError("ROOT files are not supported in this version. Please convert to NPZ/CSV.")
-        
-        # Baseline removal
-        if self.remove_baseline and self.experimental_data:
-            try:
-                freq, psd = self.experimental_data
-                est = NONPARAMS_EST(psd)
-                baseline = est.pls('BrPLS', l=self.psd_baseline_removed_l, ratio=1e-6)
-                self.experimental_data = (freq, psd - baseline)
-            except Exception as e:
-                traceback.print_exc()
 
     def detect_peaks_and_widths(self):
         """

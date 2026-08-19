@@ -69,8 +69,6 @@ class RionID_GUI(QWidget):
                 self.mode_combo.setCurrentText(p.get('mode', 'Frequency'))
                 self.value_edit.setText(p.get('value', ''))
                 self.sim_scalingfactor_edit.setText(p.get('sim_scalingfactor', ''))
-                self.remove_baseline_checkbox.setChecked(p.get('remove_baseline_checkbox', False))
-                self.psd_baseline_removed_l_edit.setText(str(p.get('psd_baseline_removed_l', '1000000')))
                 self.peak_thresh_edit.setText(str(p.get('peak_threshold_pct', '0.05')))
                 self.min_distance_edit.setText(str(p.get('min_distance', '10')))
                 self.matching_freq_min_edit.setText(str(p.get('matching_freq_min', '')))
@@ -93,8 +91,6 @@ class RionID_GUI(QWidget):
             'mode': self.mode_combo.currentText(),
             'value': self.value_edit.text(),
             'sim_scalingfactor': self.sim_scalingfactor_edit.text(),
-            'remove_baseline_checkbox': self.remove_baseline_checkbox.isChecked(),
-            'psd_baseline_removed_l': self.psd_baseline_removed_l_edit.text(),
             'peak_threshold_pct': self.peak_thresh_edit.text(),
             'min_distance': self.min_distance_edit.text(),
             'matching_freq_min': self.matching_freq_min_edit.text(),
@@ -130,16 +126,6 @@ class RionID_GUI(QWidget):
         self.vbox.addLayout(hb2)
 
     def setup_parameters(self):
-        # Baseline
-        self.remove_baseline_checkbox = QCheckBox('Remove Baseline')
-        self.vbox.addWidget(self.remove_baseline_checkbox)
-        
-        self.psd_baseline_removed_l_edit = QLineEdit("1000000")
-        hb_bl = QHBoxLayout()
-        hb_bl.addWidget(QLabel("Baseline l:"))
-        hb_bl.addWidget(self.psd_baseline_removed_l_edit)
-        self.vbox.addLayout(hb_bl)
-
         # Alpha P
         self.alphap_edit = QLineEdit()
         hb_ap = QHBoxLayout()
@@ -287,7 +273,6 @@ class RionID_GUI(QWidget):
         sim_sf_str = self.sim_scalingfactor_edit.text().strip()
         sim_sf = float(sim_sf_str) if sim_sf_str else None
 
-        psd_l = self._get_float(self.psd_baseline_removed_l_edit, 1000000.0)
         peak_pct = self._get_float(self.peak_thresh_edit, 0.05)
         min_dist = self._get_float(self.min_distance_edit, 10.0)
         alphap = self._get_float(self.alphap_edit, 0.0)
@@ -307,8 +292,6 @@ class RionID_GUI(QWidget):
             circumference=circumference,
             mode=self.mode_combo.currentText(),
             value=self.value_edit.text(),
-            remove_baseline=self.remove_baseline_checkbox.isChecked(),
-            psd_baseline_removed_l=psd_l,
             peak_threshold_pct=peak_pct,
             min_distance=min_dist,
             highlight_ions=self.highlight_ions_edit.text(),

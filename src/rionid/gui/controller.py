@@ -3,11 +3,10 @@ from loguru import logger
 from rionid.core import ImportData
 from rionid.masses import AMEData
 
-def import_controller(datafile=None, filep=None, alphap=None, refion=None, harmonics=None, 
-                      nions=None, amplitude=None, circumference=None, mode=None, value=None, 
-                      reload_data=None, remove_baseline=False, psd_baseline_removed_l=1e6,
-                      peak_threshold_pct=0.05, min_distance=10, highlight_ions=None, 
-                      io_params=None, sim_scalingfactor=None, matching_freq_min=None, 
+def import_controller(datafile=None, filep=None, alphap=None, refion=None, harmonics=None,
+                      nions=None, amplitude=None, circumference=None, mode=None, value=None,
+                      reload_data=None, peak_threshold_pct=0.05, min_distance=10, highlight_ions=None,
+                      io_params=None, sim_scalingfactor=None, matching_freq_min=None,
                       matching_freq_max=None, correct=None):
     """
     Main orchestration function for the RionID simulation workflow.
@@ -44,13 +43,8 @@ def import_controller(datafile=None, filep=None, alphap=None, refion=None, harmo
         The numerical value corresponding to the selected `mode` (e.g., the 
         reference frequency in Hz if mode is 'Frequency').
     reload_data : bool, optional
-        If True, reloads experimental data from the raw file; otherwise loads 
+        If True, reloads experimental data from the raw file; otherwise loads
         from the cached .npz.
-    remove_baseline : bool, optional
-        If True, applies baseline subtraction algorithms to the experimental spectrum.
-    psd_baseline_removed_l : float, optional
-        The smoothness parameter (lambda) for the baseline subtraction algorithm (BrPLS).
-        Default is 1e6.
     peak_threshold_pct : float, optional
         Relative threshold for peak detection (0.0 to 1.0). Default is 0.05 (5%).
     min_distance : float, optional
@@ -87,9 +81,8 @@ def import_controller(datafile=None, filep=None, alphap=None, refion=None, harmo
         elif mode == 'Kinetic Energy': ke = float(value)
         elif mode == 'Gamma': gam = float(value)
         # Calculations 
-        mydata = ImportData(refion, float(alphap), filename=datafile, reload_data=reload_data, 
+        mydata = ImportData(refion, float(alphap), filename=datafile, reload_data=reload_data,
                             circumference=circumference, highlight_ions=highlight_ions,
-                            remove_baseline=remove_baseline, psd_baseline_removed_l=psd_baseline_removed_l,
                             peak_threshold_pct=peak_threshold_pct, min_distance=min_distance,
                             matching_freq_min=matching_freq_min, matching_freq_max=matching_freq_max,
                             io_params=io_params)

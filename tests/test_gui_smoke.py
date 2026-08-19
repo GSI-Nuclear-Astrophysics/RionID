@@ -59,3 +59,20 @@ def test_visualization_signal_still_updates_the_plot(qapp, qtbot):
     win.rion_input.visualization_signal.emit(sentinel)
 
     assert calls == [sentinel]
+
+
+def test_baseline_removal_surface_is_absent(qapp):
+    from rionid.gui.inputs import RionID_GUI
+
+    panel = RionID_GUI()
+    for attr in ("remove_baseline_checkbox", "psd_baseline_removed_l_edit"):
+        assert not hasattr(panel, attr), f"baseline-removal attribute still present: {attr}"
+
+
+def test_baseline_module_is_removed():
+    import importlib
+
+    import pytest
+
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("rionid.baseline")

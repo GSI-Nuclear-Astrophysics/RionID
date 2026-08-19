@@ -139,3 +139,111 @@ must show **identical output values** (same `moq`, `srrf`,
 `simulated_data_dict` contents) at every N — only wall-clock time may
 change. If a difference in output is detected, that is evidence to report
 and stop on, per the task brief, not something to accept as a new default.
+
+## Post-Wave-2a re-measurement
+
+Status: measurements taken 2026-08-19 against the **current, optimized**
+code on the same branch (`joss-epja-prep`), after all of Wave 2a's four
+speed fixes landed. Same hardware (Linux 6.16.1-arch1-1, x86_64, 16 CPUs),
+same Python (3.9.7), same methodology as Phase 0 above (`time.perf_counter()`
+median of 5 repeats — the Phase 0 pass used 3-5; this pass used a
+flat 5 throughout), same synthetic 200,000-point spectrum and real-AME-row
+candidate lists at N=10/100/2000 (`tests.fixtures.synthetic_spectrum`).
+Every timing run also asserted the *same output-shape invariants* the
+regression suite checks (`len(moq) == len(yield_data) == N`, every
+synthetic yield `== 1.0`, correct simulated-label count) — i.e. this was
+not a speed-only script, output identity was checked inline as well as via
+the dedicated tests below. The throwaway timing scripts used for this pass
+were not committed (per the task brief); the numbers below are pasted
+directly from their console output.
+
+### Before/after: the four fixes
+
+| # | Fix | Where | N=10 before → after | N=100 before → after | N=2000 before → after |
+|---|---|---|---:|---:|---:|
+| 1 | `_calculate_moqs` O(N×M) linear AME scan → O(N) dict lookup (`AMEData.lookup`/`._index`) | `masses.py:63-66`, `core.py:224-246` | 0.7 ms → 0.011 ms | 7.6 ms → 0.111 ms | **214 ms → 2.146 ms (~100×)** |
+| 2 | `_simulated_data` O(N²) nested yield scan → O(N) `yield_by_name` dict | `core.py:262-302`, esp. 283-288 | 0.04 ms → 0.032 ms | 1.25 ms → 0.115 ms | **458 ms → 1.948 ms (~235×)** |
+| 3 | `AMEData` table parse: re-parsed on every `ImportData`/`LISEreader` construction → process-lifetime cache shared by both call sites | `masses.py:726-741` (`get_ame_data()`); consumed by `core.py:219` and `external/lisereader/reader.py:15` | 168 ms/construction → **174.8 ms once, then 0.0002 ms/call** | (same, fixed cost) | (same, fixed cost) |
+| 4 | Per-label `QFont("Arial", ...)` construction hoisted out of the per-ion redraw loop | `gui/plot.py:188` (built once before the loop, was previously built per label) | 10 ms → 10.1 ms | 42 ms → 41.6 ms | 694-1216 ms → 702.7-1719.3 ms (no material change — see note below) |
+
+Fix 3's "before" number is actually a **conservative** restatement of Phase
+0: `external/lisereader/reader.py`'s `LISEreader` was independently
+constructing its own second `AMEData()` on every run (see the in-code
+`NOTE` at `external/lisereader/reader.py:7-14`), a duplicate parse Phase 0
+did not isolate — the real old per-run AME cost was closer to **2× the
+measured 168 ms (~337 ms)** than the single 168 ms this document originally
+recorded. Both `core.py` and `LISEreader` now share the one
+`masses.get_ame_data()` cache, so the fixed cost is paid once per process
+regardless of how many times either code path runs.
+
+Fix 4's numbers show **no measurable improvement at any N** — this is
+expected and consistent with the in-code performance note at
+`gui/plot.py:162-178`: profiling during Task 9 found `plot_all_data`'s
+N=2000 cost is dominated by PyQtGraph's `addItem`/`removeItem` scene-graph
+reparenting overhead (~0.7-1.2 s of the ~1.4 s total), not by
+`pg.TextItem`/`QFont` construction (~0.14 ms/item) — the QFont hoist
+removes a real but small constant-factor cost per item, not the dominant
+one. **The deferred TextItem-reuse optimization (diffing the previous vs.
+new label set and reusing objects across redraws instead of
+destroying/recreating them) remains open** — it requires visual QA this
+sandbox cannot perform (no display server) and was deliberately not
+attempted, per that same in-code comment and Task 9's write-up. This
+re-measurement confirms that decision was correctly scoped: `plot_all_data`
+at N=2000 is, within run-to-run variance, exactly as slow after Wave 2a as
+before it.
+
+### Full re-measured tables
+
+`_calculate_moqs()` / `_simulated_data()` / `get_ame_data()` (headless, no Qt):
+
+| Stage | N=10 | N=100 | N=2000 |
+|---|---:|---:|---:|
+| `get_ame_data()` first call (cold parse) | 174.8 ms | (same, once per process) | (same) |
+| `get_ame_data()` subsequent calls (cache hit) | 0.0002 ms | 0.0002 ms | 0.0002 ms |
+| `ImportData()` construction (200k-pt spectrum, peak-detect) | 133.7 ms | 133.3 ms | 133.1 ms — flat, as expected (unaffected by these fixes) |
+| `_calculate_moqs()` | 0.011 ms | 0.111 ms | 2.146 ms |
+| `_simulated_data()`, 1 harmonic | 0.032 ms | 0.115 ms | 1.948 ms |
+| `_simulated_data()`, 7 harmonics | 0.112 ms | 0.467 ms | 8.070 ms |
+
+`plot_all_data()` (offscreen Qt, `QT_QPA_PLATFORM=offscreen`), single harmonic per candidate:
+
+| Stage | N=10 | N=100 | N=2000 |
+|---|---:|---:|---:|
+| `CreatePyGUI()` cold construction (once) | 33.8 ms | (same) | (same) |
+| `plot_all_data()` — full clear + redraw | 10.1 ms | 41.6 ms | 702.7-1719.3 ms, median 1403.2 ms (high variance, unchanged from Phase 0) |
+| `reset_view()` | 3.1 ms | 6.7 ms | 84.5 ms |
+| Peak RSS (cumulative, N=10→100→2000 in one process) | 161 MB | 165 MB | 230 MB |
+
+One honest discrepancy versus Phase 0, recorded rather than smoothed over
+per the task brief: Phase 0 reported `reset_view()` as flat (~0.15 ms)
+"independent of N," but this pass measured a clear N-dependence (3.1 ms →
+6.7 ms → 84.5 ms). `reset_view()`'s own code
+(`gui/plot.py:320-328`) is unchanged by Wave 2a — it only calls
+`setXRange`/`setYRange` — so this is most plausibly the cost of Qt/
+PyQtGraph re-clipping/repainting the now-larger scene (up to 2000
+`TextItem`s + curves) triggered by the range change, not a regression this
+plan introduced, and not one of the four fixes' targets. Flagged here for
+visibility rather than silently reconciled with the older number.
+
+### Output-identity confirmation
+
+Every timing run in this pass carried inline assertions
+(`len(model.moq) == N`, `len(model.yield_data) == N`, every yield `== 1.0`,
+and — for the GUI pass — exactly `N` rendered labels), all of which held at
+every N. These are the same invariants the committed regression suite
+checks unconditionally:
+
+- `tests/test_analysis.py::test_calculate_moqs_output[10|100]` and
+  `test_simulated_data_yield_lookup_output[10|100]` /
+  `test_simulated_data_yield_lookup_output_n2000` (the `-m slow` test) —
+  golden output shape/value checks for fixes #1 and #2 above.
+- `tests/test_masses.py::test_ionic_mass_and_moq[...]` and
+  `test_get_ame_data_is_cached` — golden ionic-mass/m-q values (unaffected
+  by the O(1) lookup rewrite) and the cache-identity check (`get_ame_data()`
+  returns the *same* object on repeated calls) for fix #3.
+- `tests/test_gui_smoke.py::test_plot_simulated_data_label_count_and_text`
+  — label count/text identity for fix #4's `QFont` hoist.
+
+All of the above pass on this branch as of this re-measurement (see the
+full-suite run recorded in the Task 10 report) — every fix is confirmed
+**faster with identical output**, exactly as Phase 0 required.

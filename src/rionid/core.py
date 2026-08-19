@@ -271,18 +271,21 @@ class ImportData(object):
                 self.brho = self.calculate_brho_relativistic(ref_moq, ref_frequency, self.ring.circumference, harmonic)
 
         self.simulated_data_dict = {}
-        self.yield_data = []
         moq_keys = list(self.moq.keys())
-        
-        for key in moq_keys:
-            found = False
-            for p in self.particles_to_simulate:
-                p_name = f"{int(p[1])}{p[0]}{int(p[4][-1])}+"
-                if p_name == key:
-                    self.yield_data.append(p[5])
-                    found = True
-                    break
-            if not found: self.yield_data.append(0)
+
+        # O(1) name -> yield lookup, built once, instead of an
+        # O(len(moq_keys) x len(particles_to_simulate)) nested scan --
+        # see docs/PERFORMANCE_BASELINE.md. "First match wins" is
+        # preserved deliberately (`if p_name not in yield_by_name`)
+        # to match the original loop's `break`-on-first-match semantics
+        # exactly, in case particles_to_simulate ever contains a
+        # duplicate name.
+        yield_by_name = {}
+        for p in self.particles_to_simulate:
+            p_name = f"{int(p[1])}{p[0]}{int(p[4][-1])}+"
+            if p_name not in yield_by_name:
+                yield_by_name[p_name] = p[5]
+        self.yield_data = [yield_by_name.get(key, 0) for key in moq_keys]
 
         self.nuclei_names = array(moq_keys)
         self.yield_data = np.array(self.yield_data, dtype=float)

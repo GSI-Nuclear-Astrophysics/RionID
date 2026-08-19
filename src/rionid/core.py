@@ -9,10 +9,9 @@ from rionid.masses import Ring, AMEData, get_ame_data, ionic_moq_u
 from rionid.external.lisereader.reader import LISEreader
 
 from rionid.io import (
-    read_psdata, 
-    handle_read_tdsm_bin, 
-    handle_spectrumnpz_data, # probably I will just keep this option, delete the others
-    handle_tiqnpz_data
+    read_psdata,
+    handle_read_tdsm_bin,
+    handle_spectrumnpz_data,
 )
 
 
@@ -163,10 +162,6 @@ class ImportData(object):
             self.experimental_data = handle_read_tdsm_bin(filename)
         elif ext == '.npz':
             self.experimental_data = handle_spectrumnpz_data(filename, **self.io_params)
-            #if 'spectrum' in base:
-            #    self.experimental_data = handle_spectrumnpz_data(filename, **self.io_params)
-            #else:
-            #    self.experimental_data = handle_tiqnpz_data(filename, **self.io_params)
         elif ext == '.root':
             raise ValueError("ROOT files are not supported in this version. Please convert to NPZ/CSV.")
 

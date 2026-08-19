@@ -69,37 +69,6 @@ def handle_read_tdsm_bin(path):
     amplitude_avg = np.average(amplitude, axis=0)
     return frequency, amplitude_avg
 
-def handle_tiqnpz_data(filename, frequency_key='arr_0', amplitude_key='arr_2', time_key='arr_1', **kwargs):
-    """
-    Handles standard IQTools NPZ files (Time-Frequency-Amplitude).
-
-    This function averages the amplitude over time.
-    Note: It skips the first 5 time slices (`amp[5:,:]`) to avoid startup artifacts/shifts.
-
-    Parameters
-    ----------
-    filename : str
-        Path to the .npz file.
-    frequency_key : str, optional
-        Key for frequency array. Default 'arr_0'.
-    amplitude_key : str, optional
-        Key for amplitude matrix. Default 'arr_2'.
-    time_key : str, optional
-        Key for time array. Default 'arr_1'.
-
-    Returns
-    -------
-    tuple
-        (frequency_array, averaged_amplitude_array)
-    """
-    data = np.load(filename)
-    freq = data[frequency_key].flatten()
-    amp = data[amplitude_key]
-    
-    # Averaging from index 5 onwards to remove potential startup artifacts
-    amplitude_average = np.average(amp[5:,:], axis=0) 
-    return freq, amplitude_average
-
 def handle_spectrumnpz_data(filename, frequency_key='arr_0', amplitude_key='arr_1', **kwargs):
     """
     Handles simple 1D Spectrum NPZ files.
@@ -120,25 +89,6 @@ def handle_spectrumnpz_data(filename, frequency_key='arr_0', amplitude_key='arr_
     """
     data = np.load(filename)
     return data[frequency_key].flatten(), data[amplitude_key]
-
-def handle_prerionidnpz_data(filename):
-    """
-    Handles legacy PreRionID NPZ files using 'x' and 'y' keys.
-
-    Parameters
-    ----------
-    filename : str
-        Path to the .npz file.
-
-    Returns
-    -------
-    tuple
-        (frequency_array, amplitude_array)
-    """
-    data = np.load(filename)
-    frequency = data['x']
-    amplitude = data['y']
-    return frequency, amplitude
 
 def read_psdata(filename, dbm=False):
     """

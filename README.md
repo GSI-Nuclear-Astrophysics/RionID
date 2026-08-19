@@ -63,16 +63,26 @@ pip install -e ".[dev]"
 ## Quick start
 
 ```bash
-# Launch the GUI
 rionid
-
-# Or run a simulation directly from the terminal
-rionid datafile.npz -r 72Ge+32 -ap 0.189 -f 1930000 -hrm 127 -c 2.55e-7 -0.985 9.5e5
 ```
+Fill in a reference ion, momentum-compaction factor, exactly one
+reference-frequency value (frequency, Brho, kinetic energy, or gamma),
+a candidate list (LISE++ `.lpp` output), the ring circumference, and a
+spectrum file, then run the simulation from the window.
+
 `datafile.npz` needs `arr_0`/`arr_1` keys (frequency, amplitude) by
 default, or any two array keys mapped via the GUI's key-selection dialog.
-See `docs/REPRODUCIBILITY.md` for a runnable example using synthetic data
-that needs no real experiment file at all.
+
+**A note on the `python3 -m rionid`/`rionid <datafile>` CLI path:** as
+currently implemented, this entry point requires a real LISE++
+candidate-list file via `-psim`/`--filep` (not optional in practice,
+despite argparse not marking it required) and has no way to supply a
+ring circumference at all — every reference-frequency mode currently
+crashes through this specific path. See
+`docs/OPEN_SCIENTIFIC_QUESTIONS.md` items 5-6 for the full evidence, and
+`docs/REPRODUCIBILITY.md` §3 for a verified, fully-working example that
+exercises the same underlying simulation engine directly, using only
+public/synthetic data.
 
 ## Parameter reference
 

@@ -1137,6 +1137,7 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 - Modify: `src/rionid/gui/inputs.py`
 - Modify: `tests/test_gui_smoke.py`
 - Modify: `README.md`
+- Modify: `docs/index.md` (also fixes a Task-4-era gap: its "Standalone" barion bullet was never updated — found during Task 5's review queue)
 
 **Interfaces:**
 - Produces: `ImportData.__init__` and `import_controller` with no `remove_baseline`/`psd_baseline_removed_l` parameters; `RionID_GUI` with no baseline-removal widgets.
@@ -1361,9 +1362,9 @@ grep -n "psd_l\b" src/rionid/gui/inputs.py
 ```
 Expected after the edit: no matches.
 
-- [ ] **Step 7: Update `README.md`**
+- [ ] **Step 7: Update `README.md` and `docs/index.md`**
 
-Replace:
+`docs/index.md` is a near-duplicate of `README.md`'s Features text (both files exist and are meant to stay in sync — a gap already found once: Task 4 updated README.md's "Standalone" barion bullet but not docs/index.md's identical line; fix that in this same step). In **both** files, replace:
 ```markdown
 *   **Signal Processing:** Built-in baseline subtraction (BrPLS) and peak detection.
 ```
@@ -1371,8 +1372,17 @@ with:
 ```markdown
 *   **Signal Processing:** Peak detection with configurable threshold and minimum distance.
 ```
+and replace:
+```markdown
+*   **Standalone:** Bundles `barion` and `lisereader` (GPL-3.0) for easy installation without complex dependency management.
+```
+with:
+```markdown
+*   **Standalone:** Bundles `lisereader` (GPL-3.0) for easy installation without complex dependency management.
+```
+(`docs/index.md` should already be missing the "Automated Matching" bullet — Task 5 updated that one correctly; this step only fixes the two bullets Task 4/this task's README-only instructions missed.)
 
-Remove these two lines from the "Arguments" list (confirmed during Task 4/5 planning that neither is actually a real CLI flag — `__main__.py`'s argparse never defined them, and the CLI path never threads `peak_threshold_pct` through to `ImportData` either; this was a pre-existing README/CLI mismatch, not something this removal creates):
+In `README.md` only (this text does not appear in `docs/index.md`), remove these two lines from the "Arguments" list (confirmed during Task 4/5 planning that neither is actually a real CLI flag — `__main__.py`'s argparse never defined them, and the CLI path never threads `peak_threshold_pct` through to `ImportData` either; this was a pre-existing README/CLI mismatch, not something this removal creates):
 ```markdown
 *   `--remove_baseline`: Apply baseline subtraction.
 *   `--peak_threshold_pct`: Peak detection threshold (0.0 - 1.0).
@@ -1391,7 +1401,7 @@ Expected: all green.
 - [ ] **Step 10: Commit**
 
 ```bash
-git add -A src/rionid/baseline.py src/rionid/core.py src/rionid/gui/controller.py src/rionid/gui/inputs.py tests/test_gui_smoke.py README.md
+git add -A src/rionid/baseline.py src/rionid/core.py src/rionid/gui/controller.py src/rionid/gui/inputs.py tests/test_gui_smoke.py README.md docs/index.md
 git commit -m "Remove the baseline-subtraction feature (BrPLS)
 
 Per your request: deletes src/rionid/baseline.py and every call site
@@ -1407,6 +1417,11 @@ __main__.py's argparse, and the CLI path never threaded
 peak_threshold_pct through to ImportData either -- baseline removal was
 already GUI-only. Peak detection itself (find_peaks, threshold, min
 distance) is unaffected and remains GUI-configurable.
+
+Also brings docs/index.md back in sync with README.md's Features
+bullets: fixes its baseline-subtraction wording (this task) and its
+Standalone/barion wording, which Task 4 updated in README.md but missed
+in docs/index.md.
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 ```

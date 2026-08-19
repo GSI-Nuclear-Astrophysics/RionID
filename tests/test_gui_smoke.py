@@ -76,3 +76,34 @@ def test_baseline_module_is_removed():
 
     with pytest.raises(ModuleNotFoundError):
         importlib.import_module("rionid.baseline")
+
+
+def test_plot_simulated_data_label_count_and_text(qapp, synthetic_spectrum_path):
+    """gui/plot.py's per-label QFont hoist (docs/PERFORMANCE_BASELINE.md)
+    must not change any rendered label's text or count."""
+    from rionid.core import ImportData
+    from rionid.gui.plot import CreatePyGUI
+    from rionid.masses import get_ame_data
+    from tests.fixtures.synthetic_spectrum import build_ame_candidates
+
+    ame_table = get_ame_data().ame_table
+    candidates = build_ame_candidates(ame_table, 10)
+    ref_name, ref_aa, ref_zz = candidates[0][0], candidates[0][1], candidates[0][2]
+    model = ImportData(
+        f"{ref_aa}{ref_name}{ref_zz}+", alphap=0.189,
+        filename=synthetic_spectrum_path, reload_data=True,
+        circumference=108.36,
+    )
+    model.ame = get_ame_data()
+    model.ame_data = model.ame.ame_table
+    model.particles_to_simulate = candidates
+    model._calculate_moqs()
+    model._calculate_srrf(fref=1.93e6)
+    model._simulated_data(harmonics=[127.0], mode="Frequency")
+
+    win = CreatePyGUI()
+    win.plot_all_data(model)
+
+    labels = [item.toPlainText() for (_line, item) in win.simulated_items if item is not None]
+    assert len(labels) == 10
+    assert all(labels)  # every label is non-empty text

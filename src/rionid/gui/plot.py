@@ -160,6 +160,22 @@ class CreatePyGUI(QMainWindow):
             self.legend.addItem(self.red_triangles, 'Detected Peaks')
 
     def plot_simulated_data(self, data):
+        # PERFORMANCE NOTE (see docs/PERFORMANCE_BASELINE.md): profiling
+        # at N=2000 candidates shows this method dominated not by
+        # pg.TextItem construction itself (~0.14ms/item) but by
+        # PyQtGraph's addItem/removeItem scene-graph reparenting overhead
+        # (itemChange/changeParent/signal connect-disconnect), triggered
+        # on every clear_simulated_data()+plot_simulated_data() cycle --
+        # roughly 0.7-1.2s of the ~1.4s total at N=2000. The real fix is
+        # reusing TextItem objects across redraws instead of destroying
+        # and recreating them, which requires diffing the previous vs.
+        # new (harmonic, ion) label set and correctly handling ions that
+        # change highlight/reference status between redraws (their
+        # colour must update, not just position/text). That correctness
+        # cannot be verified visually in this environment (no display
+        # server) and was deliberately NOT attempted here -- see
+        # docs/superpowers/plans/2026-08-19-wave2a-depid-masses-speed.md
+        # Task 9. Revisit once you can visually QA it.
         self.simulated_data = data.simulated_data_dict
         refion = data.ref_ion
         highlights = data.highlight_ions or []
@@ -169,7 +185,8 @@ class CreatePyGUI(QMainWindow):
         
         color_ref = '#ff7f0e' # Orange for Reference
         color_match = '#2ca02c' # Green for Matches
-        
+        label_font = QFont("Arial", self.font_size)
+
         for i, (harmonic, sdata) in enumerate(self.simulated_data.items()):
             # Arrays for bulk plotting (Vectorization)
             bulk_freqs = []
@@ -216,7 +233,7 @@ class CreatePyGUI(QMainWindow):
                     new_label = label
                 
                 text_item = pg.TextItem(text=new_label, color=c, anchor=(0.5, 1))
-                text_item.setFont(QFont("Arial", self.font_size))
+                text_item.setFont(label_font)
                 text_item.setPos(freq, yield_value * 1.05)
                 self.plot_widget.addItem(text_item)
 

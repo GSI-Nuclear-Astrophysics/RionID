@@ -1237,7 +1237,7 @@ is in `docs/LEGACY_BEHAVIOUR.md`.
 
 ## Supported formats
 
-- Spectra: `.npz` (configurable key mapping), `.csv`/`.txt` (pipe-delimited),
+- Spectra: `.npz` (configurable key mapping), `.csv` (pipe-delimited),
   `.bin_fre`/`.bin_time`/`.bin_amp` (TDSM binary triples).
 - Candidate lists: LISE++ output (`.lpp`).
 - Export: `.ods` (candidate table), `simulation_result.out` (fixed-width
@@ -1247,10 +1247,10 @@ is in `docs/LEGACY_BEHAVIOUR.md`.
 
 ## Troubleshooting
 
-- **No network access on first run:** the mass table (AME2020/NUBASE) is
+- **No network access on first run:** the AME2020 mass table is
   downloaded to `~/.ame/` on first use if not already cached there. If you
-  have no network access, obtain `~/.ame/ame.data` and `~/.ame/nubase.data`
-  from a machine that does, and copy the `~/.ame/` directory over.
+  have no network access, obtain `~/.ame/ame.data` from a machine that
+  does, and copy the `~/.ame/` directory over.
 - **Qt import crashes / binding-detection errors:** if you have both
   PyQt5 and PySide6 installed, some Qt-related tooling (notably
   `pytest-qt`, if you're running the test suite) can crash trying to
@@ -1496,7 +1496,7 @@ named nuclides (including the manuscript's own E143 example: ⁷²Ge³²⁺,
 pytest tests/test_masses.py -v
 ```
 Expected: `5 passed`. Requires network access on first run only, to
-populate `~/.ame/` with the AME2020/NUBASE2020 tables (cached afterward).
+populate `~/.ame/` with the AME2020 mass table (cached afterward).
 
 ## 3. Reproduce a full simulation run on synthetic data
 
@@ -1703,7 +1703,7 @@ is not reconstructed here from git log; see the git tag history for that.
 ### Changed
 
 - The subset of the vendored `barion` library RionID actually uses
-  (ionic-mass electron-binding correction, AME/NUBASE table loading, a
+  (ionic-mass electron-binding correction, AME2020 table loading, a
   minimal ring-circumference holder) is now `src/rionid/masses.py`,
   extracted with the underlying arithmetic verified bit-identical to the
   original. `external/barion/` is gone.
@@ -1711,7 +1711,7 @@ is not reconstructed here from git log; see the git tag history for that.
   candidate mass-to-charge lookup and simulated-data yield lookup — see
   `docs/PERFORMANCE_BASELINE.md` for measured before/after numbers
   (~100× and ~235× respectively at N=2000 candidates).
-- The AME/NUBASE mass table is now cached for the process lifetime
+- The AME2020 mass table is now cached for the process lifetime
   instead of being re-parsed on every simulation run.
 - `pyproject.toml` migrated to PEP 621 metadata; `pip install -e ".[dev]"`
   now works (it could not before).
@@ -1829,7 +1829,7 @@ input by design. Its main external-data-handling surface is:
 - Reading user-supplied spectrum/candidate files (`.npz`/`.csv`/`.lpp`/
   binary formats) — a malformed file could in principle cause a crash or
   resource-exhaustion condition, not remote code execution.
-- Downloading the public AME/NUBASE mass tables from IAEA
+- Downloading the public AME2020 mass table from IAEA
   (`www-nds.iaea.org`) over HTTPS on first use.
 
 Dependency vulnerabilities are monitored via `pip-audit` in CI and

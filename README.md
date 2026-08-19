@@ -93,7 +93,7 @@ is in `docs/LEGACY_BEHAVIOUR.md`.
 
 ## Supported formats
 
-- Spectra: `.npz` (configurable key mapping), `.csv`/`.txt` (pipe-delimited),
+- Spectra: `.npz` (configurable key mapping), `.csv` (pipe-delimited),
   `.bin_fre`/`.bin_time`/`.bin_amp` (TDSM binary triples).
 - Candidate lists: LISE++ output (`.lpp`).
 - Export: `.ods` (candidate table), `simulation_result.out` (fixed-width
@@ -103,10 +103,10 @@ is in `docs/LEGACY_BEHAVIOUR.md`.
 
 ## Troubleshooting
 
-- **No network access on first run:** the mass table (AME2020/NUBASE) is
+- **No network access on first run:** the AME2020 mass table is
   downloaded to `~/.ame/` on first use if not already cached there. If you
-  have no network access, obtain `~/.ame/ame.data` and `~/.ame/nubase.data`
-  from a machine that does, and copy the `~/.ame/` directory over.
+  have no network access, obtain `~/.ame/ame.data` from a machine that
+  does, and copy the `~/.ame/` directory over.
 - **Qt import crashes / binding-detection errors:** if you have both
   PyQt5 and PySide6 installed, some Qt-related tooling (notably
   `pytest-qt`, if you're running the test suite) can crash trying to

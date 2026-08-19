@@ -334,10 +334,11 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 - Create: `tests/test_masses.py`
 - Modify: `src/rionid/core.py`
 - Modify: `src/rionid/external/lisereader/reader.py`
+- Modify: `src/rionid/gui/controller.py` (imports `AMEData` from `external.barion` too — found during pre-flight review, not in the original design pass)
 - Delete: `src/rionid/external/barion/` (whole directory: `amedata.py`, `particle.py`, `ring.py`, `__init__.py`, `__pycache__/`)
 
 **Interfaces:**
-- Produces: `rionid.masses.Ring(name, circumference)`, `rionid.masses.AMEData` (with `.ame_table`, `.nubase_table`, `.lookup(name, aa) -> row | None`), `rionid.masses.get_ame_data() -> AMEData` (process-lifetime-cached singleton), `rionid.masses.ionic_mass_u(ame_row, qq) -> float`, `rionid.masses.ionic_moq_u(ame_row, qq) -> float`.
+- Produces: `rionid.masses.Ring(name, circumference)`, `rionid.masses.AMEData` (with `.ame_table`, `.nubase_table`, `.lookup(name, aa) -> row | None`, plus the `.to_mev`/`.to_u`/`.get_elbien` statics — `gui/controller.py`'s `save_simulation_results` calls `AMEData.to_mev` directly), `rionid.masses.get_ame_data() -> AMEData` (process-lifetime-cached singleton), `rionid.masses.ionic_mass_u(ame_row, qq) -> float`, `rionid.masses.ionic_moq_u(ame_row, qq) -> float`.
 - Consumes (for the test only, before deletion): the still-present `rionid.external.barion.amedata.AMEData`/`rionid.external.barion.particle.Particle`, used once to derive the golden numbers baked into `tests/test_masses.py` below (already computed and verified during this planning pass — do not re-derive).
 
 - [ ] **Step 1: Write `tests/test_masses.py` with pre-verified golden values**
@@ -757,6 +758,24 @@ class LISEreader:
         self._read(filename)
 ```
 
+- [ ] **Step 9b: Update `src/rionid/gui/controller.py`**
+
+`gui/controller.py` also imports `AMEData` from `external.barion` (used once, in `save_simulation_results`, to convert mass units for the output table) — found during the controller's pre-flight cross-task scan, not in the original design pass. Replace:
+```python
+from rionid.external.barion.amedata import AMEData
+```
+with:
+```python
+from rionid.masses import AMEData
+```
+No other change is needed in this file — `AMEData.to_mev(mass_u)` (line ~208) resolves identically against `masses.AMEData` (verbatim-copied constants/statics).
+
+Verify no other reference to `external.barion` remains anywhere in `src/`:
+```bash
+grep -rln "external\.barion\|external import barion" src/
+```
+Expected after Steps 8, 9, and 9b: no matches.
+
 - [ ] **Step 10: Delete `external/barion/`**
 
 ```bash
@@ -783,7 +802,7 @@ with:
 - [ ] **Step 13: Commit**
 
 ```bash
-git add -A src/rionid/masses.py src/rionid/core.py src/rionid/external/ tests/test_masses.py README.md
+git add -A src/rionid/masses.py src/rionid/core.py src/rionid/gui/controller.py src/rionid/external/ tests/test_masses.py README.md
 git commit -m "Extract used barion subset into masses.py; delete external/barion/; O(1) AME lookup
 
 Extracts the ionic-mass electron-binding correction, AME/NUBASE table
@@ -807,6 +826,11 @@ cache. See docs/PERFORMANCE_BASELINE.md.
 tests/test_masses.py's golden values were verified against the
 still-vendored barion implementation before this change (see the design
 spec) and now pass against masses.py directly.
+
+gui/controller.py also imported AMEData from external.barion (used once
+in save_simulation_results for a unit conversion) -- found during the
+pre-flight cross-task review, repointed at masses.AMEData alongside the
+rest.
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 ```

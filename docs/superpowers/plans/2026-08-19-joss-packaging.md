@@ -1476,7 +1476,7 @@ committed data — none of these need real experimental data.
 
 This reproduces the manuscript's harmonic-214 → revolution-space →
 harmonic-127 coefficient-transform worked example (`RionID-EPJA/main.tex`
-Eqs. 9-21) directly against the shipped code:
+Eqs. 9-23) directly against the shipped code:
 
 ```bash
 pip install -e ".[dev]"

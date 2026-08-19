@@ -243,11 +243,11 @@ def save_simulation_results(mydata, mode, harmonics, sort_index, filename="simul
             if mode == "Frequency":
                 fre = mydata.srrf[i] * mydata.ref_frequency
             elif mode == "Brho":
-                fre = mydata.srrf[i] * mydata.ref_frequency * harmonic
+                fre = mydata.srrf[i] * mydata.ref_frequency * harmonic  # pyright: ignore[reportPossiblyUnboundVariable]  -- see docs/OPEN_SCIENTIFIC_QUESTIONS.md #4
             yield_ = mydata.yield_data[i]
             moq = mydata.moq[ion]
             mass_u = mydata.total_mass[ion]
             mass = AMEData.to_mev(mass_u) * 1e6
-            result_line = f"{ion:<15}{fre:<30.10f}{yield_:<15.4e}{moq:<15.12f}{mass:<15.3f}"
+            result_line = f"{ion:<15}{fre:<30.10f}{yield_:<15.4e}{moq:<15.12f}{mass:<15.3f}"  # pyright: ignore[reportPossiblyUnboundVariable]  -- see docs/OPEN_SCIENTIFIC_QUESTIONS.md #4
             logger.info(result_line)
             file.write(result_line + "\n")

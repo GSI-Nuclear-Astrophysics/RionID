@@ -366,7 +366,7 @@ class ImportData(object):
             gamma = ImportData.gamma_ke(ke, aa, ref_mass)
         elif gam:
             gamma = gam
-        beta = ImportData.beta(gamma)
+        beta = ImportData.beta(gamma)  # pyright: ignore[reportPossiblyUnboundVariable]  -- see docs/OPEN_SCIENTIFIC_QUESTIONS.md #1
         return ImportData.velocity(beta) / ring_circumference
 
     @staticmethod

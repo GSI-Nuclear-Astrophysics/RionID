@@ -36,10 +36,10 @@ jobs:
           key: ame-nubase-tables-v1
 
       - name: Lint (ruff check)
-        run: ruff check .
+        run: ruff check src/
 
       - name: Format check (ruff format)
-        run: ruff format --check .
+        run: ruff format --check src/
 
       - name: Type check (pyright)
         run: pyright

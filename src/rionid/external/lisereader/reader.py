@@ -28,13 +28,13 @@ class LISEreader:
                 file_start = i + 1
 
         # finds point in line where separator changes from space to comma
-        self.centre_index = len(lines[file_start].split()) - 1
+        self.centre_index = len(lines[file_start].split()) - 1  # pyright: ignore[reportPossiblyUnboundVariable]  -- see docs/OPEN_SCIENTIFIC_QUESTIONS.md #2
 
         # splits lines and adds to list of all data
         self.data = [
             line.replace("+", "").split()[0 : self.centre_index]
             + line.replace("=", "").split()[self.centre_index].split(",")
-            for line in lines[file_start:]
+            for line in lines[file_start:]  # pyright: ignore[reportPossiblyUnboundVariable]  -- see docs/OPEN_SCIENTIFIC_QUESTIONS.md #2
         ]
 
     def get_index(self, name):
@@ -53,7 +53,7 @@ class LISEreader:
             return returned_queries[0]
 
         else:
-            print(element[0] + element[1] + "+")
+            print(element[0] + element[1] + "+")  # pyright: ignore[reportPossiblyUnboundVariable]  -- see docs/OPEN_SCIENTIFIC_QUESTIONS.md #3
             raise ValueError('get_index() returned nothing. Check formatting (e.g. "80Kr35+")')
 
     def get_info(self, name):

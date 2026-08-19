@@ -119,13 +119,16 @@ select = ["E", "F", "W", "I"]
 # The verbatim-copied electron-binding-energy physics table (see
 # masses.py's module docstring) is intentionally many numbers per line --
 # do not reformat it for line length, that risks transcription damage to
-# physics reference data for zero benefit.
+# physics reference data for zero benefit. NOTE: per-file-ignores only
+# suppresses `ruff check` (the linter), not `ruff format`. The table
+# itself must additionally be wrapped in `# fmt: off` / `# fmt: on` at
+# the point of use (Task 2) -- ruff format does honor those markers.
 "src/rionid/masses.py" = ["E501"]
 
 [tool.pyright]
 include = ["src"]
 pythonVersion = "3.9"
-typeCheckingMode = "basic"
+typeCheckingMode = "standard"
 # Disabled: dominated by PyQt5/pyqtgraph stub-interop false positives
 # (Qt enum access patterns valid at runtime via SIP but not modeled by
 # the bundled stubs; pyqtgraph's dynamically-assigned attributes;
@@ -248,9 +251,26 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 
 **Interfaces:** None — no function signature or behaviour changes anywhere in this task.
 
-This task was fully dry-run during planning: `ruff check --select E,F,W,I --line-length 100 --extend-per-file-ignores "src/rionid/masses.py:E501" --fix src/` auto-fixed 221 of 305 findings (all mechanical: trailing whitespace, blank-line whitespace, missing final newlines, import sorting) with zero semantic risk, and `ruff format` reformatted 11 files. Exactly 4 findings remained, each named precisely below.
+This task was fully dry-run during planning: `ruff check --select E,F,W,I --line-length 100 --extend-per-file-ignores "src/rionid/masses.py:E501" --fix src/` auto-fixed 221 of 305 findings (all mechanical: trailing whitespace, blank-line whitespace, missing final newlines, import sorting) with zero semantic risk, and `ruff format` reformatted 11 files. Exactly 4 `ruff check` findings remained, each named precisely below.
 
-- [ ] **Step 1: Run the safe auto-fix and formatter**
+**Correction found during Task 2's execution (not caught during the dry-run above):** `ruff format` reformatted `masses.py`'s `ElBiEn` physics table too, since `[tool.ruff.lint.per-file-ignores]` only suppresses the linter, not the formatter. Step 1a below (added after the fact) fixes this with `# fmt: off`/`# fmt: on` markers, which `ruff format` does honor, around only the table itself.
+
+- [ ] **Step 1a: Protect the `ElBiEn` table from the formatter, before running it**
+
+In `src/rionid/masses.py`, add `# fmt: off` immediately before the
+`ElBiEn = [` line and `# fmt: on` immediately after its closing `]]` (the
+last line of the table). `ruff format` honors these markers (adopted from
+Black's convention) and will skip only the fenced region — the rest of the
+file (module docstring, `Ring`/`AMEData` methods, the module-level
+functions at the tail) still gets formatted normally. Do this *before*
+Step 1b, not after — `[tool.ruff.lint.per-file-ignores]` (Task 1's config)
+only suppresses the *linter*'s `E501` check on this file, it does **not**
+exempt the file from the *formatter* at all; without these markers,
+`ruff format` reformats the table's ~540 lines of numbers (whitespace
+changes only, but exactly the kind of transcription-adjacent risk the
+per-file-ignore was meant to avoid).
+
+- [ ] **Step 1b: Run the safe auto-fix and formatter**
 
 ```bash
 ruff check --fix src/
@@ -264,6 +284,11 @@ formatting issue) and "11 files reformatted" (or similar), then re-run
 `ruff check src/` to confirm exactly 4 findings remain, matching the ones
 below. If more than 4 remain, or different ones, STOP and report —
 something about the repo state differs from what planning found.
+
+After this step, verify the table itself is untouched:
+`git diff src/rionid/masses.py` should show only the `# fmt: off`/
+`# fmt: on` lines added, plus any import-order fix, with **zero** changes
+inside the `ElBiEn = [...]` block itself.
 
 - [ ] **Step 2: Fix `src/rionid/__init__.py`'s two "imported but unused" findings**
 
@@ -395,14 +420,17 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 
 **Files:**
 - Create: `docs/OPEN_SCIENTIFIC_QUESTIONS.md`
+- Modify: `pyproject.toml` (only if Task 1's committed config still says
+  `typeCheckingMode = "basic"` — see the note in Step 1 below; if it
+  already says `"standard"`, there is nothing to change here)
 
-**Interfaces:** None — this task makes no source changes (Task 2 already applied
-the one safe fix `pyright` needed).
+**Interfaces:** None — this task makes no application source changes (Task 2
+already applied the one safe `src/` fix `pyright` needed).
 
-`pyright`'s config already landed in Task 1. This task verifies it passes
-and creates the standing location the whole engagement's brief has
-referred to for logging suspected issues, since this is the first time
-concrete candidates for it exist.
+`pyright`'s config landed in Task 1. This task verifies it reports the
+expected findings and creates the standing location the whole engagement's
+brief has referred to for logging suspected issues, since this is the
+first time concrete candidates for it exist.
 
 - [ ] **Step 1: Run `pyright` and confirm it's clean of everything except the known,
       logged findings**
@@ -413,12 +441,26 @@ pyright
 Expected: exactly these `reportPossiblyUnboundVariable` findings (the
 suppressed categories from Task 1's config should produce nothing):
 - `src/rionid/core.py` — `gamma` possibly unbound (in `calc_ref_rev_frequency`)
-- `src/rionid/external/lisereader/reader.py` — `file_start` possibly unbound (×2), `element` possibly unbound
+- `src/rionid/external/lisereader/reader.py` — `file_start` possibly unbound (×2), `element` possibly unbound (×2)
 - `src/rionid/gui/controller.py` — `harmonic` possibly unbound, `fre` possibly unbound (in `save_simulation_results`)
 
-If `pyright` reports anything else (a genuinely new finding, or fewer/more
-than these 6), STOP and report — investigate before proceeding, since this
-plan's Task 1 config was tuned against exactly this known set.
+That's **7 raw diagnostic lines** total (5 distinct conceptual issues;
+`file_start` and `element` each have 2 use sites flagged). If `pyright`
+reports anything else (a genuinely new finding, a different count, or any
+finding in a category the config's suppressions were supposed to silence),
+STOP and report — investigate before proceeding, since this plan's Task 1
+config was tuned against exactly this known set.
+
+**Note on `typeCheckingMode`:** Task 1's config uses `"standard"`, not
+`"basic"` — this was corrected after Task 3's first execution attempt
+found that pyright 1.1.411's `"basic"` preset does not enable
+`reportPossiblyUnboundVariable` by default (an error in the original
+design/plan pass: the dry-run that found these findings during planning
+ran pyright with no config at all, which defaults to `"standard"`, not
+`"basic"` — the plan then specified `"basic"` without re-testing that
+exact combination). If your checkout somehow still has `"basic"` in
+`pyproject.toml`, that is stale — the fix landed as part of this task's
+own execution; see the ledger for the full account.
 
 - [ ] **Step 2: Write `docs/OPEN_SCIENTIFIC_QUESTIONS.md`**
 
@@ -509,15 +551,26 @@ have proven.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add docs/OPEN_SCIENTIFIC_QUESTIONS.md
-git commit -m "Add docs/OPEN_SCIENTIFIC_QUESTIONS.md, logging pyright's 6 real findings
+git add docs/OPEN_SCIENTIFIC_QUESTIONS.md pyproject.toml
+git commit -m "Add docs/OPEN_SCIENTIFIC_QUESTIONS.md, logging pyright's 7 real findings
 
-pyright (configured in the prior task) surfaces 6 genuine
-possibly-unbound-variable findings, all pre-existing and none introduced
-by any change in this engagement. Per the project's rule against
-silently altering numerical/physics-adjacent behaviour, each is
-documented with evidence, potential impact, and a proposed validation
-rather than fixed here -- resolving any of them is your call.
+pyright (configured in Task 1) surfaces 7 genuine
+possibly-unbound-variable diagnostic lines across 5 distinct issues (2 of
+the 5 -- file_start and element in lisereader/reader.py -- each have 2
+flagged use sites), all pre-existing and none introduced by any change in
+this engagement. Per the project's rule against silently altering
+numerical/physics-adjacent behaviour, each is documented with evidence,
+potential impact, and a proposed validation rather than fixed here --
+resolving any of them is your call.
+
+Also fixes pyproject.toml's [tool.pyright] typeCheckingMode from "basic"
+to "standard": pyright 1.1.411's "basic" preset does not enable
+reportPossiblyUnboundVariable by default, so the "basic" setting Task 1
+committed silently produced zero diagnostics -- an error in the original
+plan (the dry-run that found these findings ran pyright with no config,
+which defaults to "standard"; the plan then specified "basic" without
+re-testing that specific combination). The other rule-level suppressions
+already in that config apply identically under "standard".
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 ```
@@ -1865,9 +1918,22 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
   tooling findings, is in scope, not scope creep.
 - **Ordering matters**: Task 1 must land before Tasks 2-6 (they need the
   `[tool.ruff]`/`[tool.pyright]` config Task 1 writes). Task 2 must land
-  before Task 3 (the `gui/plot.py` fix Task 2 makes is what lets Task 3's
-  `pyright` run report only the 6 logged findings, not 7). Task 12 must
-  land last (it verifies every other task's output exists).
+  before Task 3 (the `gui/plot.py` fix Task 2 makes is what removes one
+  additional false-positive `reportPossiblyUnboundVariable` finding, so
+  Task 3's `pyright` run reports only the genuinely pre-existing issues,
+  not that one too). Task 12 must land last (it verifies every other
+  task's output exists).
+- **Correction found during Task 3's execution**: Task 1's `[tool.pyright]`
+  config originally specified `typeCheckingMode = "basic"`, under which
+  pyright 1.1.411 does not enable `reportPossiblyUnboundVariable` at all —
+  silently producing zero diagnostics instead of the expected findings.
+  Fixed to `"standard"` (Task 3, folded into its own commit rather than
+  reopening the already-reviewed Task 1). The real finding count is **7**
+  diagnostic lines across 5 issues, not 6 as originally estimated — a
+  counting error in the original plan text (Task 3's own
+  `docs/OPEN_SCIENTIFIC_QUESTIONS.md` content was already correct on this;
+  only the summary count in Task 3's verification step and commit message
+  said "6").
 - **Nothing in this plan touches `_calculate_srrf`, any test file's
   assertions, or any file under `tests/`** — confirmed by re-reading every
   task's file list above.

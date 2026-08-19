@@ -89,9 +89,7 @@ class ImportData(object):
         # Results containers
         self.peak_freqs = []
         self.peak_heights = []
-        self.chi2 = 0
-        self.match_count = 0
-        
+
         self.cache_file = self._get_cache_file_path(filename) if filename else None
         self.experimental_data = None
 
@@ -232,65 +230,6 @@ class ImportData(object):
         self.peak_freqs = peak_freqs[mask]
         self.peak_heights = amp[peaks][mask]
         self.peak_widths_freq = np.zeros_like(self.peak_freqs) 
-
-    def compute_matches(self, match_threshold, f_min=None, f_max=None):
-        """
-        Matches simulated ions to experimental peaks.
-
-        Parameters
-        ----------
-        match_threshold : float
-            Max frequency difference (Hz) to consider a match.
-        f_min : float, optional
-            Min frequency bound for matching.
-        f_max : float, optional
-            Max frequency bound for matching.
-
-        Returns
-        -------
-        tuple
-            (chi2, match_count, highlight_ions)
-        """
-        sim_items = []
-        for h_name, sdata in self.simulated_data_dict.items():
-            harmonic = float(h_name)
-            for row in sdata:
-                sim_items.append((float(row[0]), row[2], harmonic))
-        
-        if not sim_items: return 0, 0, []
-
-        sim_freqs = np.array([x[0] for x in sim_items])
-        chi2 = 0.0
-        match_count = 0
-        matched_ions = []
-        
-        # Logic: For every experimental peak, find closest simulated line
-        for exp_freq in self.peak_freqs:
-            if f_min and exp_freq < f_min: continue
-            if f_max and exp_freq > f_max: continue
-            
-            idx = np.argmin(np.abs(sim_freqs - exp_freq))
-            diff = abs(sim_freqs[idx] - exp_freq)
-            
-            if diff <= match_threshold:
-                chi2 += diff**2
-                match_count += 1
-                matched_ions.append(sim_items[idx][1])
-        
-        self.chi2 = chi2 / match_count if match_count > 0 else float('inf')
-        self.match_count = match_count
-        self.highlight_ions = list(set(matched_ions)) # Update highlights with matches
-        
-        return self.chi2, self.match_count, self.highlight_ions
-
-    def save_matched_result(self, filename):
-        """Saves the list of matched ions to a text file."""
-        if not filename or not self.highlight_ions: return
-        with open(filename, 'w') as f:
-            f.write("Matched Ions List\n")
-            for ion in self.highlight_ions:
-                f.write(f"{ion}\n")
-        print(f"Matched results saved to {filename}")
 
     def _save_experimental_data(self):
         """Caches loaded data to a compressed NPZ file."""

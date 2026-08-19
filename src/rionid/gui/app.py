@@ -67,15 +67,9 @@ class MainWindow(QWidget):
         self.setLayout(layout)
 
         # --- Signal Connections ---
-        
-        # 1. Update plot when a full simulation run finishes
+
+        # Update plot when a full simulation run finishes
         self.rion_input.visualization_signal.connect(self.update_visualization)
-        
-        # 2. Overlay specific simulation (used for Quick PID visual feedback loop)
-        self.rion_input.overlay_sim_signal.connect(self.overlay_simulation)
-        
-        # 3. Handle plot clicks (used to stop Quick PID loops or pick coordinates)
-        self.visualization_widget.plotClicked.connect(self.rion_input.onPlotClicked)
 
     def update_visualization(self, data):
         """
@@ -91,23 +85,6 @@ class MainWindow(QWidget):
             simulated ion frequency dictionaries.
         """
         self.visualization_widget.updateData(data)
-
-    def overlay_simulation(self, data):
-        """
-        Overlays a specific simulation result onto the existing plot.
-
-        This is primarily used during the 'Quick PID' scan to show visual feedback
-        of the fitting process without reloading or clearing the heavy experimental 
-        data every frame. It clears previous simulation lines but keeps the 
-        experimental spectrum.
-
-        Parameters
-        ----------
-        data : ImportData
-            The data object containing the specific simulation iteration to display.
-        """
-        self.visualization_widget.clear_simulated_data()
-        self.visualization_widget.plot_simulated_data(data)
 
 def main():
     """

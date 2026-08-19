@@ -88,7 +88,7 @@ select = ["E", "F", "W", "I"]
 [tool.pyright]
 include = ["src"]
 pythonVersion = "3.9"
-typeCheckingMode = "basic"
+typeCheckingMode = "standard"
 # Disabled: dominated by PyQt5/pyqtgraph stub-interop false positives
 # (Qt enum access patterns valid at runtime via SIP but not modeled by
 # the bundled stubs; pyqtgraph's dynamically-assigned attributes;

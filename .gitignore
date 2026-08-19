@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Scratch/local workspaces
+.superpowers/
+.worktrees/
+site/

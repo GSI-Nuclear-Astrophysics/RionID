@@ -6,11 +6,7 @@ import numpy as np
 from numpy import array, polyval, sqrt, stack
 
 from rionid.external.lisereader.reader import LISEreader
-from rionid.io import (
-    handle_read_tdsm_bin,
-    handle_spectrumnpz_data,
-    read_psdata,
-)
+from rionid.io import handle_spectrumnpz_data
 from rionid.masses import AMEData, Ring, get_ame_data, ionic_moq_u
 
 
@@ -142,11 +138,7 @@ class ImportData(object):
         base, file_extension = os.path.splitext(filename)
         ext = file_extension.lower()
 
-        if ext == ".csv":
-            self.experimental_data = read_psdata(filename, dbm=False)
-        elif ext in [".bin_fre", ".bin_time", ".bin_amp"]:
-            self.experimental_data = handle_read_tdsm_bin(filename)
-        elif ext == ".npz":
+        if ext == ".npz":
             self.experimental_data = handle_spectrumnpz_data(filename, **self.io_params)
         elif ext == ".root":
             raise ValueError(

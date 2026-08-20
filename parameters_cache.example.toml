@@ -1,0 +1,17 @@
+# Optional starting point for local GUI settings.
+# Copy this file to parameters_cache.toml and replace the values locally.
+# parameters_cache.toml is ignored by Git because it can contain personal paths.
+
+datafile = ""
+filep = ""
+alphap = "0.51"
+harmonics = "211 212 213"
+refion = "72Ge32+"
+highlight_ions = "72Ge31+ 72Ge30+"
+mode = "Frequency"
+value = ""
+sim_scalingfactor = "1.0"
+correction = ""
+nions = ""
+reload_data = false
+simulation_result = ""

@@ -7,11 +7,6 @@ from rionid.masses import get_ame_data
 
 class LISEreader:
     def __init__(self, filename):
-        # Shares the process-lifetime AME cache instead of parsing a
-        # second independent copy. The prior `ame.init_ame_db`
-        # line (no parentheses) was a no-op that never actually called
-        # the method -- dropped, since AMEData's own __init__ already
-        # parses both tables.
         ame = get_ame_data()
         self.ame_data = ame.ame_table
         self._read(filename)

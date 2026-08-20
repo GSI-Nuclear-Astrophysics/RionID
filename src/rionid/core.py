@@ -226,13 +226,6 @@ class ImportData(object):
         self.simulated_data_dict = {}
         moq_keys = list(self.moq.keys())
 
-        # O(1) name -> yield lookup, built once, instead of an
-        # O(len(moq_keys) x len(particles_to_simulate)) nested scan.
-        # "First match wins" is
-        # preserved deliberately (`if p_name not in yield_by_name`)
-        # to match the original loop's `break`-on-first-match semantics
-        # exactly, in case particles_to_simulate ever contains a
-        # duplicate name.
         yield_by_name = {}
         for p in self.particles_to_simulate:
             p_name = f"{int(p[1])}{p[0]}{int(p[4][-1])}+"
@@ -293,7 +286,7 @@ class ImportData(object):
             gamma = ImportData.gamma_ke(ke, aa, ref_mass)
         elif gam:
             gamma = gam
-        beta = ImportData.beta(gamma)  # pyright: ignore[reportPossiblyUnboundVariable]
+        beta = ImportData.beta(gamma) 
         return ImportData.velocity(beta) / ring_circumference
 
     @staticmethod

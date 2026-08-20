@@ -1,12 +1,9 @@
 """Nuclide mass and mass-to-charge utilities.
 
-Extracted from the vendored `barion` library (Xaratustrah, 2015-2016,
-GPL-3.0 -- you are also an upstream co-owner of that library) to keep only
-the subset RionID actually uses: AME2020 mass-table loading,
-the ionic-mass electron-binding correction, and a minimal storage-ring circumference
-holder. The physical constants and electron-binding-energy table
-(`AMEData.ElBiEn`) below are copied verbatim from
-`external/barion/amedata.py` and must not be hand-edited.
+Loads and caches the AME2020 mass table and computes ionic mass-to-charge
+ratios via the electron-binding-energy correction. The physical constants
+and electron-binding-energy table (`AMEData.ElBiEn`) below must not be
+hand-edited.
 """
 
 import os
@@ -16,12 +13,7 @@ import fortranformat as ff
 
 
 class Ring:
-    """A storage ring, reduced to what RionID uses: name and circumference.
-
-    The upstream `barion.Ring` also carried `gamma_t`/`mag_rigidity`/
-    `acceptance`/per-facility presets (`get_ring_dict`) -- confirmed unused
-    by RionID and were therefore dropped here.
-    """
+    """A storage ring, reduced to what RionID uses: name and circumference."""
 
     def __init__(self, name, circumference):
         self.name = name
@@ -61,19 +53,16 @@ class AMEData:
         return self._index.get((name, aa))
 
     def _download(self):
-        """Downloads the AME2020 table into `self.home_folder`.
-        Ported verbatim from
-        `external/barion/amedata.py:AMEData.download_ame_data`."""
+        """Downloads the AME2020 table into `self.home_folder`."""
         req = ur.Request(AMEData.AME_DATA_LINK, headers={"User-Agent": "Magic Browser"})
         g = ur.urlopen(req)
         with open(self.home_folder + "ame.data", "b+w") as f:
             f.write(g.read())
 
     def _parse_ame(self):
-        """Parses the fixed-width AME2020 mass table. Ported verbatim from
-        `external/barion/amedata.py:AMEData.init_ame_db`; the FORTRAN
-        format string and 36-line header skip are the AME2020 file layout
-        and must not change without a new AME release."""
+        """Parses the fixed-width AME2020 mass table. The FORTRAN format
+        string and 36-line header skip are the AME2020 file layout and
+        must not change without a new AME release."""
         ffline = ff.FortranRecordReader(
             "(a4,a1,i3,i5,i5,i5,1x,a3,a4,1x,f14.6,f12.6,f13.5,1x,f10.5,1x,a2,f13.5,f11.5,1x,i3,1x,f13.6,f12.6)"
         )
@@ -708,10 +697,8 @@ def ionic_mass_u(ame_row, qq):
 
     Implements the atomic-to-ionic mass correction: the ionic mass is the atomic
     mass minus the removed electrons' rest mass, plus the corresponding
-    change in total electron binding energy divided by c^2. Ported
-    verbatim from
-    `external/barion/particle.py:Particle.get_ionic_mass_in_u` -- do not
-    change this arithmetic.
+    change in total electron binding energy divided by c^2. Do not change
+    this arithmetic.
     """
     zz = ame_row[4]
     atomic_mass_u = (ame_row[15] * 1.0e6 + ame_row[16]) / 1.0e6

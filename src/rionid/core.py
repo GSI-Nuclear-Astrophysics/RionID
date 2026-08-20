@@ -87,10 +87,9 @@ class ImportData(object):
                 freq, amp = self.experimental_data
 
                 # Log-Safety (Clip negatives): ensure all values are > 0
-                # for logarithmic plotting. NOTE: the floor here (1e-29)
-                # intentionally does not match gui/plot.py's separate
-                # 1e-9 floor for the same purpose -- pre-existing,
-                # retained for compatibility with historical spectra.
+                # for logarithmic plotting. This floor (1e-29) intentionally
+                # differs from gui/plot.py's separate 1e-9 floor for the
+                # same purpose.
                 amp = np.maximum(amp, 1e-29)
 
                 # Normalization: scale so the highest peak is 1.0
@@ -182,12 +181,8 @@ class ImportData(object):
 
     def _calculate_moqs(self):
         """Calculates mass-to-charge ratios for every candidate in
-        self.particles_to_simulate, via an O(1) AME-table lookup (see
-        an O(N x AME-table-size) linear scan per candidate). The `particles=`
-        parameter this method used to accept was dead code -- confirmed
-        by repo-wide grep that every call site (__main__.py,
-        gui/controller.py, gui/inputs.py) always calls it with no
-        arguments -- and has been removed.
+        self.particles_to_simulate, via an O(1) AME-table lookup per
+        candidate.
         """
         self.moq = dict()
         self.total_mass = dict()

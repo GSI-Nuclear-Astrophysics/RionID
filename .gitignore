@@ -12,11 +12,6 @@ site/
 .venv/
 test_rionid_env/
 
-# Companion-manuscript workspace (maintained separately)
-RionID-EPJA/
-RionID-EPJA.zip
-paper/
-
 # This library does not commit Poetry's application-style lock file
 poetry.lock
 

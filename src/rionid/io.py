@@ -1,4 +1,3 @@
-import os
 import ezodf
 import numpy as np
 
@@ -23,6 +22,7 @@ def handle_spectrumnpz_data(filename, frequency_key="arr_0", amplitude_key="arr_
     """
     data = np.load(filename)
     return data[frequency_key].flatten(), data[amplitude_key]
+
 
 def write_arrays_to_ods(file_name, sheet_name, names, *arrays):
     """

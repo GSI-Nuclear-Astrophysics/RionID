@@ -286,7 +286,7 @@ class ImportData(object):
             gamma = ImportData.gamma_ke(ke, aa, ref_mass)
         elif gam:
             gamma = gam
-        beta = ImportData.beta(gamma) 
+        beta = ImportData.beta(gamma)
         return ImportData.velocity(beta) / ring_circumference
 
     @staticmethod

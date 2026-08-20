@@ -61,6 +61,11 @@ cd rionid
 pip install -e ".[dev]"
 ```
 
+The GUI stores local settings and file paths in `parameters_cache.toml`.
+That file is ignored by Git. A sanitized template is provided as
+`parameters_cache.example.toml`; copy it locally if you want to reset or
+prepare the settings manually.
+
 ## Quick start
 
 ```bash
@@ -85,7 +90,8 @@ CLI workflow:
 
 ```bash
 python examples/quickstart.py
-rionid-cli quickstart_synthetic.npz -psim examples/candidates.lpp \
+rionid-cli examples/data/quickstart_synthetic.npz \
+  -psim examples/data/candidates.lpp \
   -r 72Ge32+ -ap 0.189 -f 1930000 -hrm 127
 ```
 

@@ -14,13 +14,15 @@ from tests.fixtures.synthetic_spectrum import make_synthetic_spectrum
 
 
 def main():
-    spectrum_path = "quickstart_synthetic.npz"
+    data_dir = Path(__file__).resolve().parent / "data"
+    data_dir.mkdir(exist_ok=True)
+    spectrum_path = data_dir / "quickstart_synthetic.npz"
     make_synthetic_spectrum(spectrum_path)
     print(f"Wrote synthetic spectrum to {spectrum_path}")
 
     # 72Ge32+ (fully stripped germanium-72) is the worked reference ion.
     ref_ion = "72Ge32+"
-    candidates_path = Path(__file__).resolve().parent / "candidates.lpp"
+    candidates_path = data_dir / "candidates.lpp"
 
     model = ImportData(
         ref_ion, alphap=0.189, filename=spectrum_path, reload_data=True, circumference=108.36

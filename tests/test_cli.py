@@ -99,7 +99,7 @@ def test_run_controller_passes_circumference_and_normalized_frequency_mode(monke
 
 
 def test_public_candidate_fixture_runs_full_controller(synthetic_spectrum_path):
-    candidate_file = Path(__file__).parents[1] / "examples" / "candidates.lpp"
+    candidate_file = Path(__file__).parents[1] / "examples" / "data" / "candidates.lpp"
 
     model = run_controller(
         synthetic_spectrum_path,

@@ -24,5 +24,5 @@ poetry.lock
 parameters_cache.toml
 simulation_result.out
 *_cache.npz
-quickstart_synthetic.npz
-synthetic_demo.npz
+examples/data/quickstart_synthetic.npz
+examples/data/synthetic_demo.npz

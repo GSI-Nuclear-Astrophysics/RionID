@@ -106,13 +106,12 @@ rionid-cli quickstart_synthetic.npz -psim examples/candidates.lpp \
 
 ## Supported formats
 
-- Spectra: `.npz` (configurable key mapping), `.csv` (pipe-delimited),
-  `.bin_fre`/`.bin_time`/`.bin_amp` (TDSM binary triples).
+- Spectra: `.npz` (configurable key mapping).
 - Candidate lists: LISE++ output (`.lpp`).
 - Export: `.ods` (candidate table), `simulation_result.out` (fixed-width
   text table).
 - `.root` files are explicitly **not** supported — this is a deliberate
-  restriction, not a bug; convert to `.npz`/`.csv` first.
+  restriction, not a bug; convert to `.npz` first.
 
 ## Troubleshooting
 

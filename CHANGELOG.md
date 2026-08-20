@@ -21,8 +21,7 @@ is not reconstructed here from git log; see the git tag history for that.
 - **Peak utilities**: peak detection, peak plotting, peak threshold and
   matching-frequency controls were removed from the supported workflow.
 - Dead/unreachable code: `handle_tiqnpz_data`/`handle_prerionidnpz_data`
-  I/O handlers, the vendored `barion` library's unused automatic-
-  identification methods (`identify_range` and related), and several
+  I/O handlers, and several
   unused GUI widgets tied to the removed features above.
 
 ### Changed

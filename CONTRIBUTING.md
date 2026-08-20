@@ -22,8 +22,7 @@ pyright                       # type check
 ## Scope
 
 This is a parameter-driven scientific GUI application, not an automatic
-particle-identification tool — see the README's "Scope and non-goals"
-section. Contributions that reintroduce automatic species assignment,
+particle-identification tool. Contributions that reintroduce automatic species assignment,
 hidden heuristics, or silent peak-to-ion matching will not be accepted;
 the deterministic, user-guided workflow is a deliberate design decision,
 not an oversight.

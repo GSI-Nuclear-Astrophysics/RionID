@@ -280,12 +280,14 @@ class ImportData(object):
         ref_mass, ring_circumference, brho=None, ref_charge=None, ke=None, aa=None, gam=None
     ):
         """Static helper to calculate revolution frequency."""
-        if brho:
+        if brho is not None:
             gamma = ImportData.gamma_brho(brho, ref_charge, ref_mass)
-        elif ke:
+        elif ke is not None:
             gamma = ImportData.gamma_ke(ke, aa, ref_mass)
-        elif gam:
+        elif gam is not None:
             gamma = gam
+        else:
+            raise ValueError("Provide one of brho, ke, or gam to calculate frequency.")
         beta = ImportData.beta(gamma)
         return ImportData.velocity(beta) / ring_circumference
 

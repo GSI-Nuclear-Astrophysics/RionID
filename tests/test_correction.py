@@ -65,3 +65,8 @@ def test_srrf_correction_preserves_harmonic_transform():
     expected_F127 = F127_0 + a127 * F127_0**2 + b127 * F127_0 + c127
     # The absolute tolerance provides generous float64 headroom.
     assert actual_F127 == pytest.approx(expected_F127, abs=1e-6)
+
+
+def test_reference_frequency_requires_a_calculation_mode():
+    with pytest.raises(ValueError, match="Provide one of brho, ke, or gam"):
+        ImportData.calc_ref_rev_frequency(ref_mass=1.0, ring_circumference=108.36)

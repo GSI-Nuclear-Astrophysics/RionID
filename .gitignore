@@ -9,8 +9,20 @@ dist/
 .superpowers/
 .worktrees/
 site/
+.venv/
+test_rionid_env/
+
+# Companion-manuscript workspace (maintained separately)
+RionID-EPJA/
+RionID-EPJA.zip
+paper/
+
+# This library does not commit Poetry's application-style lock file
+poetry.lock
 
 # RionID runtime artifacts (written by the app itself, not source)
 parameters_cache.toml
 simulation_result.out
 *_cache.npz
+quickstart_synthetic.npz
+synthetic_demo.npz

@@ -7,11 +7,8 @@ from rionid.masses import get_ame_data
 
 class LISEreader:
     def __init__(self, filename):
-        # NOTE: previously constructed its own independent AMEData(),
-        # re-parsing the mass table a SECOND time on top of core.py's own
-        # load (docs/PERFORMANCE_BASELINE.md underestimated this -- the
-        # real per-run AME-parse cost was ~2x the measured ~168ms). Now
-        # shares the process-lifetime cache. The prior `ame.init_ame_db`
+        # Shares the process-lifetime AME cache instead of parsing a
+        # second independent copy. The prior `ame.init_ame_db`
         # line (no parentheses) was a no-op that never actually called
         # the method -- dropped, since AMEData's own __init__ already
         # parses both tables.
@@ -28,13 +25,13 @@ class LISEreader:
                 file_start = i + 1
 
         # finds point in line where separator changes from space to comma
-        self.centre_index = len(lines[file_start].split()) - 1  # pyright: ignore[reportPossiblyUnboundVariable]  -- see docs/OPEN_SCIENTIFIC_QUESTIONS.md #2
+        self.centre_index = len(lines[file_start].split()) - 1  # pyright: ignore[reportPossiblyUnboundVariable]
 
         # splits lines and adds to list of all data
         self.data = [
             line.replace("+", "").split()[0 : self.centre_index]
             + line.replace("=", "").split()[self.centre_index].split(",")
-            for line in lines[file_start:]  # pyright: ignore[reportPossiblyUnboundVariable]  -- see docs/OPEN_SCIENTIFIC_QUESTIONS.md #2
+            for line in lines[file_start:]  # pyright: ignore[reportPossiblyUnboundVariable]
         ]
 
     def get_index(self, name):
@@ -53,7 +50,7 @@ class LISEreader:
             return returned_queries[0]
 
         else:
-            print(element[0] + element[1] + "+")  # pyright: ignore[reportPossiblyUnboundVariable]  -- see docs/OPEN_SCIENTIFIC_QUESTIONS.md #3
+            print(element[0] + element[1] + "+")  # pyright: ignore[reportPossiblyUnboundVariable]
             raise ValueError('get_index() returned nothing. Check formatting (e.g. "80Kr35+")')
 
     def get_info(self, name):

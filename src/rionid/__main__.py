@@ -10,28 +10,36 @@ from rionid.core import ImportData
 from rionid.gui.plot import CreatePyGUI
 from rionid.io import write_arrays_to_ods
 
+ESR_CIRCUMFERENCE_M = 108.36
 
-def main():
-    """
-    Main entry point for the command-line interface (CLI).
 
-    Parses arguments, initializes logging, and dispatches the analysis controller
-    for one or more data files.
-    """
-    scriptname = "RionID"
+def build_parser():
+    """Build the parser used by the ``python -m rionid`` interface."""
     parser = argparse.ArgumentParser(description="RionID: Ring-stored ion Identification")
     modes = parser.add_mutually_exclusive_group(required=True)
 
     # Main Arguments
     parser.add_argument("datafile", type=str, nargs="+", help="Name of the input file with data.")
     parser.add_argument(
-        "-ap", "--alphap", type=float, help="Momentum compaction factor of the ring."
+        "-ap",
+        "--alphap",
+        type=float,
+        required=True,
+        help="Momentum compaction factor of the ring.",
     )
     parser.add_argument(
-        "-r", "--refion", type=str, help="Reference ion (Format: AAXX+CC, e.g., 72Ge+35)."
+        "-r",
+        "--refion",
+        type=str,
+        required=True,
+        help="Reference ion (format: AAXXCC+, e.g., 72Ge35+).",
     )
     parser.add_argument(
-        "-psim", "--filep", type=str, help="Path to particle list file (LISE++ output)."
+        "-psim",
+        "--filep",
+        type=str,
+        required=True,
+        help="Path to particle list file (LISE++ output).",
     )
     parser.add_argument(
         "-hrm", "--harmonics", type=float, default=[1.0], nargs="+", help="Harmonics to simulate."
@@ -80,11 +88,31 @@ def main():
         help="Polynomial correction parameters (a0, a1, a2).",
     )
 
+    parser.add_argument(
+        "--circumference",
+        type=float,
+        default=ESR_CIRCUMFERENCE_M,
+        metavar="METRES",
+        help=f"Ring circumference in metres (default: ESR, {ESR_CIRCUMFERENCE_M}).",
+    )
+    return parser
+
+
+def main():
+    """
+    Main entry point for the command-line interface (CLI).
+
+    Parses arguments, initializes logging, and dispatches the analysis controller
+    for one or more data files.
+    """
+    scriptname = "RionID"
+    parser = build_parser()
+
     args = parser.parse_args()
 
     # Argument Validation
-    if args.brho is None and args.fref is None and args.kenergy is None and args.gamma is None:
-        parser.error("You must provide one reference parameter: -f, -b, -ke, or -gam.")
+    if args.circumference <= 0:
+        parser.error("--circumference must be greater than zero.")
 
     # Logging Setup
     if args.logLevel:
@@ -119,6 +147,7 @@ def main():
             alphap=args.alphap,
             ref_ion=args.refion,
             harmonics=args.harmonics,
+            circumference=args.circumference,
             brho=args.brho,
             fref=args.fref,
             ke=args.kenergy,
@@ -140,6 +169,7 @@ def run_controller(
     alphap,
     ref_ion,
     harmonics,
+    circumference=ESR_CIRCUMFERENCE_M,
     brho=None,
     fref=None,
     ke=None,
@@ -165,6 +195,8 @@ def run_controller(
         Reference ion string.
     harmonics : list
         List of harmonics to simulate.
+    circumference : float, optional
+        Ring circumference in metres. Defaults to the ESR value of 108.36 m.
     brho : float, optional
         Magnetic rigidity.
     fref : float, optional
@@ -185,7 +217,7 @@ def run_controller(
         The Qt application instance.
     """
     # 1. Calculations (Model)
-    mydata = ImportData(ref_ion, alphap, filename=data_file)
+    mydata = ImportData(ref_ion, alphap, filename=data_file, circumference=circumference)
     log.debug(f"Experimental data shape: {shape(mydata.experimental_data)}")
 
     mydata._set_particles_to_simulate_from_file(particles_to_simulate)
@@ -199,7 +231,7 @@ def run_controller(
     if not isinstance(harmonics, list):
         harmonics = [harmonics]
 
-    mydata._simulated_data(harmonics=harmonics, brho=brho, mode="Frequency" if fref else "Brho")
+    mydata._simulated_data(harmonics=harmonics, brho=brho, mode="frequency" if fref else "brho")
 
     # 2. Filter Ions (Optional)
     if nions:
@@ -228,6 +260,8 @@ def run_controller(
     if show and app:
         sa = CreatePyGUI(mydata.experimental_data, mydata.simulated_data_dict)
         sa.show()
+
+    return mydata
 
 
 def display_nions(nions, yield_data, nuclei_names, simulated_data_dict, ref_ion, harmonics):

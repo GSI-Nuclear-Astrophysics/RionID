@@ -5,8 +5,7 @@ import sys
 
 import numpy as np
 import toml
-from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot
-from PyQt5.QtGui import QCursor
+from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -27,6 +26,8 @@ from .controller import import_controller
 from .dialogs import KeySelectionDialog
 
 log.basicConfig(level=log.DEBUG)
+
+GUI_RING_CIRCUMFERENCE_M = 108.36
 
 
 class RionID_GUI(QWidget):
@@ -77,15 +78,10 @@ class RionID_GUI(QWidget):
                 self.alphap_edit.setText(p.get("alphap", ""))
                 self.harmonics_edit.setText(p.get("harmonics", ""))
                 self.refion_edit.setText(p.get("refion", ""))
-                self.circumference_edit.setText(p.get("circumference", ""))
                 self.highlight_ions_edit.setText(p.get("highlight_ions", ""))
                 self.mode_combo.setCurrentText(p.get("mode", "Frequency"))
                 self.value_edit.setText(p.get("value", ""))
                 self.sim_scalingfactor_edit.setText(p.get("sim_scalingfactor", ""))
-                self.peak_thresh_edit.setText(str(p.get("peak_threshold_pct", "0.05")))
-                self.min_distance_edit.setText(str(p.get("min_distance", "10")))
-                self.matching_freq_min_edit.setText(str(p.get("matching_freq_min", "")))
-                self.matching_freq_max_edit.setText(str(p.get("matching_freq_max", "")))
                 self.correction_edit.setText(p.get("correction", ""))
                 self.nions_edit.setText(p.get("nions", ""))
                 self.reload_data_checkbox.setChecked(p.get("reload_data", True))
@@ -100,15 +96,10 @@ class RionID_GUI(QWidget):
             "alphap": self.alphap_edit.text(),
             "harmonics": self.harmonics_edit.text(),
             "refion": self.refion_edit.text(),
-            "circumference": self.circumference_edit.text(),
             "highlight_ions": self.highlight_ions_edit.text(),
             "mode": self.mode_combo.currentText(),
             "value": self.value_edit.text(),
             "sim_scalingfactor": self.sim_scalingfactor_edit.text(),
-            "peak_threshold_pct": self.peak_thresh_edit.text(),
-            "min_distance": self.min_distance_edit.text(),
-            "matching_freq_min": self.matching_freq_min_edit.text(),
-            "matching_freq_max": self.matching_freq_max_edit.text(),
             "correction": self.correction_edit.text(),
             "nions": self.nions_edit.text(),
             "reload_data": self.reload_data_checkbox.isChecked(),
@@ -118,12 +109,12 @@ class RionID_GUI(QWidget):
             toml.dump(p, f)
 
     def setup_file_selection(self):
-        self.datafile_label = QLabel("Experimental Data File:")
+        self.datafile_label = QLabel("Experimental data (.npz):")
         self.datafile_edit = QLineEdit()
         self.datafile_button = QPushButton("Browse")
         self.datafile_button.clicked.connect(self.browse_datafile)
 
-        self.filep_label = QLabel(".lpp File:")
+        self.filep_label = QLabel("LISE++ file (.lpp):")
         self.filep_edit = QLineEdit()
         self.filep_button = QPushButton("Browse")
         self.filep_button.clicked.connect(self.browse_lppfile)
@@ -141,24 +132,22 @@ class RionID_GUI(QWidget):
         self.vbox.addLayout(hb2)
 
     def setup_parameters(self):
-        # Alpha P
+        # Momentum compaction factor
         self.alphap_edit = QLineEdit()
         hb_ap = QHBoxLayout()
-        hb_ap.addWidget(QLabel("Alpha P:"))
+        hb_ap.addWidget(QLabel("Momentum compaction factor (~0.51):"))
         hb_ap.addWidget(self.alphap_edit)
         self.vbox.addLayout(hb_ap)
 
         # Standard Params
         self.harmonics_edit = QLineEdit()
         self.refion_edit = QLineEdit()
-        self.circumference_edit = QLineEdit()
         self.highlight_ions_edit = QLineEdit()
 
         for lbl, widget in [
-            ("Harmonics:", self.harmonics_edit),
-            ("Ref Ion:", self.refion_edit),
-            ("Circumference:", self.circumference_edit),
-            ("Highlight Ions:", self.highlight_ions_edit),
+            ("Harmonics (211 212 213):", self.harmonics_edit),
+            ("Reference ion (72Ge32+):", self.refion_edit),
+            ("Ions to highlight (72Ge31+ 72Ge30+):", self.highlight_ions_edit),
         ]:
             h = QHBoxLayout()
             h.addWidget(QLabel(lbl))
@@ -181,40 +170,6 @@ class RionID_GUI(QWidget):
         h_sf.addWidget(QLabel("Scaling Factor:"))
         h_sf.addWidget(self.sim_scalingfactor_edit)
         self.vbox.addLayout(h_sf)
-
-        # Peak Detection
-        self.peak_thresh_edit = QLineEdit("0.05")
-        self.min_distance_edit = QLineEdit("10")
-        h_peak = QHBoxLayout()
-        h_peak.addWidget(QLabel("Peak Thresh %:"))
-        h_peak.addWidget(self.peak_thresh_edit)
-        h_peak.addWidget(QLabel("Min Dist:"))
-        h_peak.addWidget(self.min_distance_edit)
-        self.vbox.addLayout(h_peak)
-
-        # Matching Freq Range
-        self.matching_freq_min_edit = QLineEdit()
-        self.matching_freq_max_edit = QLineEdit()
-        self.pick_matching_freq_min_button = QPushButton("Pick")
-        self.pick_matching_freq_min_button.clicked.connect(
-            lambda: self.enterPlotPickMode(self.matching_freq_min_edit)
-        )
-        self.pick_matching_freq_max_button = QPushButton("Pick")
-        self.pick_matching_freq_max_button.clicked.connect(
-            lambda: self.enterPlotPickMode(self.matching_freq_max_edit)
-        )
-
-        h_mf = QHBoxLayout()
-        h_mf.addWidget(QLabel("Match Freq Min:"))
-        h_mf.addWidget(self.matching_freq_min_edit)
-        h_mf.addWidget(self.pick_matching_freq_min_button)
-        self.vbox.addLayout(h_mf)
-
-        h_mf2 = QHBoxLayout()
-        h_mf2.addWidget(QLabel("Match Freq Max:"))
-        h_mf2.addWidget(self.matching_freq_max_edit)
-        h_mf2.addWidget(self.pick_matching_freq_max_button)
-        self.vbox.addLayout(h_mf2)
 
         # Optional Features Group
         self.optional_group = QGroupBox("Optional Features")
@@ -239,35 +194,21 @@ class RionID_GUI(QWidget):
 
     def setup_controls(self):
         self.run_button = QPushButton("Run")
+        self.run_button.setStyleSheet(
+            "QPushButton { background-color: #66bb6a; color: black; font-weight: bold; }"
+        )
         self.run_button.clicked.connect(self.run_script)
         self.vbox.addWidget(self.run_button)
 
         self.exit_button = QPushButton("Exit")
+        self.exit_button.setStyleSheet(
+            "QPushButton { background-color: #ef5350; color: black; font-weight: bold; }"
+        )
         self.exit_button.clicked.connect(self.close_application)
         self.vbox.addWidget(self.exit_button)
 
     def close_application(self):
         sys.exit()
-
-    def enterPlotPickMode(self, target):
-        if not self.visualization_widget:
-            return
-        self._pick_target = target
-        target.setStyleSheet("background-color: lightgray;")
-        self.visualization_widget.plot_widget.setCursor(Qt.CrossCursor)
-        self.visualization_widget.plotClicked.connect(self._onPlotPicked)
-
-    @pyqtSlot()
-    def _onPlotPicked(self):
-        pos = self.visualization_widget.plot_widget.mapFromGlobal(QCursor.pos())
-        point = self.visualization_widget.plot_widget.plotItem.vb.mapSceneToView(pos)
-
-        if self._pick_target:
-            self._pick_target.setText(f"{point.x() * 1e6:.2f}")
-            self._pick_target.setStyleSheet("")
-
-        self.visualization_widget.plot_widget.setCursor(Qt.ArrowCursor)
-        self.visualization_widget.plotClicked.disconnect(self._onPlotPicked)
 
     def _get_float(self, widget, default=0.0):
         text = widget.text().strip()
@@ -300,15 +241,7 @@ class RionID_GUI(QWidget):
         sim_sf_str = self.sim_scalingfactor_edit.text().strip()
         sim_sf = float(sim_sf_str) if sim_sf_str else None
 
-        peak_pct = self._get_float(self.peak_thresh_edit, 0.05)
-        min_dist = self._get_float(self.min_distance_edit, 10.0)
         alphap = self._get_float(self.alphap_edit, 0.0)
-        circumference = self._get_float(self.circumference_edit, 0.0)
-
-        match_min_str = self.matching_freq_min_edit.text().strip()
-        match_min = float(match_min_str) if match_min_str else None
-        match_max_str = self.matching_freq_max_edit.text().strip()
-        match_max = float(match_max_str) if match_max_str else None
 
         args = argparse.Namespace(
             datafile=datafile,
@@ -316,18 +249,14 @@ class RionID_GUI(QWidget):
             alphap=alphap,
             harmonics=self.harmonics_edit.text(),
             refion=self.refion_edit.text(),
-            circumference=circumference,
+            circumference=GUI_RING_CIRCUMFERENCE_M,
             mode=self.mode_combo.currentText(),
             value=self.value_edit.text(),
-            peak_threshold_pct=peak_pct,
-            min_distance=min_dist,
             highlight_ions=self.highlight_ions_edit.text(),
             io_params=io_params,
             reload_data=self.reload_data_checkbox.isChecked(),
             nions=self.nions_edit.text(),
             sim_scalingfactor=sim_sf,
-            matching_freq_min=match_min,
-            matching_freq_max=match_max,
             correct=correct,
         )
 

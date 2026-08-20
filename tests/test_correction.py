@@ -1,13 +1,9 @@
-"""Golden regression test for the canonical polynomial correction
-(ImportData._calculate_srrf + ImportData._simulated_data), cross-checked
-against RionID-EPJA/main.tex's own worked numeric example (Eqs. 9-21: the
-harmonic-214 -> revolution-space -> harmonic-127 coefficient transform).
+"""Golden regression test for the canonical polynomial correction.
 
-See docs/PUBLICATION_TRACEABILITY.md for the manuscript mapping. This test
-must keep passing, UNMODIFIED, through every later task in this plan --
-none of them may change _calculate_srrf's arithmetic, coefficient
-ordering, or units.
+This test protects _calculate_srrf's arithmetic, coefficient ordering,
+and units.
 """
+
 from types import SimpleNamespace
 
 import pytest
@@ -15,8 +11,8 @@ import pytest
 from rionid.core import ImportData
 
 
-def test_srrf_correction_matches_manuscript_harmonic_transform():
-    # Manuscript's harmonic-214 coefficients (RionID-EPJA/main.tex:372-377)
+def test_srrf_correction_preserves_harmonic_transform():
+    # Reference harmonic-214 coefficients.
     a214, b214, c214 = 1.19262945e-9, -9.85167644e-1, 2.03447706e8
     h214 = 214
 
@@ -43,8 +39,7 @@ def test_srrf_correction_matches_manuscript_harmonic_transform():
     # ion. This isolates srrf to exactly f^(0)/f_ref BEFORE correction
     # (moq[candidate] - moq[ref] == 0), so f^(0) == f_ref exactly and the
     # test can pick f_ref freely without needing a real spectrum, candidate
-    # list, or AME table load. See docs/superpowers/specs/
-    # 2026-08-19-wave2a-depid-masses-speed-design.md for the derivation.
+    # list, or AME table load.
     model = ImportData.__new__(ImportData)
     model.moq = {"REF+1": 1.0}
     model.ref_ion = "REF+1"
@@ -68,6 +63,5 @@ def test_srrf_correction_matches_manuscript_harmonic_transform():
     # check (Eq. scaling_invariant).
     F127_0 = f0_test * h127
     expected_F127 = F127_0 + a127 * F127_0**2 + b127 * F127_0 + c127
-    # Matches to 0.000e+00 Hz per the Phase 0 audit; abs tolerance here is
-    # generous float64 headroom, not a sign of expected disagreement.
+    # The absolute tolerance provides generous float64 headroom.
     assert actual_F127 == pytest.approx(expected_F127, abs=1e-6)

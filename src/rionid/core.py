@@ -4,7 +4,6 @@ import sys
 
 import numpy as np
 from numpy import array, polyval, sqrt, stack
-from scipy.signal import find_peaks
 
 from rionid.external.lisereader.reader import LISEreader
 from rionid.io import (
@@ -37,14 +36,6 @@ class ImportData(object):
         Ring circumference in meters.
     highlight_ions : str or list, optional
         Ions to highlight in the plot.
-    peak_threshold_pct : float, optional
-        Peak detection threshold (0.0-1.0).
-    min_distance : float, optional
-        Minimum distance between peaks.
-    matching_freq_min : float, optional
-        Minimum frequency for peak matching.
-    matching_freq_max : float, optional
-        Maximum frequency for peak matching.
     io_params : dict, optional
         Extra parameters for file I/O (e.g., NPZ keys).
     """
@@ -57,10 +48,6 @@ class ImportData(object):
         reload_data=None,
         circumference=None,
         highlight_ions=None,
-        peak_threshold_pct=0.05,
-        min_distance=10,
-        matching_freq_min=None,
-        matching_freq_max=None,
         io_params=None,
     ):
 
@@ -80,16 +67,7 @@ class ImportData(object):
         self.ref_ion = refion.strip()
         self._parse_ref_ion(refion)
 
-        # Physics / Matching Params
-        self.peak_threshold_pct = float(peak_threshold_pct) if peak_threshold_pct else 0.05
-        self.min_distance = float(min_distance) if min_distance else 10
-        self.matching_freq_min = matching_freq_min
-        self.matching_freq_max = matching_freq_max
         self.io_params = io_params or {}
-
-        # Results containers
-        self.peak_freqs = []
-        self.peak_heights = []
 
         self.cache_file = self._get_cache_file_path(filename) if filename else None
         self.experimental_data = None
@@ -112,8 +90,7 @@ class ImportData(object):
                 # for logarithmic plotting. NOTE: the floor here (1e-29)
                 # intentionally does not match gui/plot.py's separate
                 # 1e-9 floor for the same purpose -- pre-existing,
-                # unchanged, logged in docs/LEGACY_BEHAVIOUR.md, not
-                # fixed as part of this removal.
+                # retained for compatibility with historical spectra.
                 amp = np.maximum(amp, 1e-29)
 
                 # Normalization: scale so the highest peak is 1.0
@@ -122,9 +99,6 @@ class ImportData(object):
                     amp = amp / max_val
 
                 self.experimental_data = (freq, amp)
-
-            # Process peaks after loading and processing
-            self.detect_peaks_and_widths()
 
     def _parse_ref_ion(self, refion):
         # Regex to extract Mass(Digits), Element(Letters), Charge(Digits)
@@ -157,7 +131,7 @@ class ImportData(object):
             return []
         if isinstance(input_str, list):
             return input_str
-        return [x.strip() for x in input_str.split(",") if x.strip()]
+        return [x for x in re.split(r"[\s,]+", input_str.strip()) if x]
 
     def _get_cache_file_path(self, filename):
         """Generates the cache filename."""
@@ -179,39 +153,6 @@ class ImportData(object):
             raise ValueError(
                 "ROOT files are not supported in this version. Please convert to NPZ/CSV."
             )
-
-    def detect_peaks_and_widths(self):
-        """
-        Detects peaks in the experimental spectrum using scipy.signal.find_peaks.
-
-        Updates `self.peak_freqs` and `self.peak_heights`.
-        """
-        if self.experimental_data is None:
-            return
-        freq, amp = self.experimental_data
-
-        rel_height = max(0.0, min(self.peak_threshold_pct, 1.0))
-        height_thresh = np.max(amp) * rel_height
-
-        peaks, _ = find_peaks(
-            amp,
-            height=height_thresh,
-            distance=self.min_distance,
-            prominence=height_thresh * 0.2,
-            width=1,
-        )
-
-        # Filter by frequency window
-        peak_freqs = freq[peaks]
-        mask = np.ones_like(peaks, dtype=bool)
-        if self.matching_freq_min is not None:
-            mask &= peak_freqs >= self.matching_freq_min
-        if self.matching_freq_max is not None:
-            mask &= peak_freqs <= self.matching_freq_max
-
-        self.peak_freqs = peak_freqs[mask]
-        self.peak_heights = amp[peaks][mask]
-        self.peak_widths_freq = np.zeros_like(self.peak_freqs)
 
     def _save_experimental_data(self):
         """Caches loaded data to a compressed NPZ file."""
@@ -242,8 +183,7 @@ class ImportData(object):
     def _calculate_moqs(self):
         """Calculates mass-to-charge ratios for every candidate in
         self.particles_to_simulate, via an O(1) AME-table lookup (see
-        docs/PERFORMANCE_BASELINE.md; previously an
-        O(N x AME-table-size) linear scan per candidate). The `particles=`
+        an O(N x AME-table-size) linear scan per candidate). The `particles=`
         parameter this method used to accept was dead code -- confirmed
         by repo-wide grep that every call site (__main__.py,
         gui/controller.py, gui/inputs.py) always calls it with no
@@ -287,7 +227,7 @@ class ImportData(object):
         """Generates the final simulation dictionary for plotting."""
         for harmonic in harmonics:
             ref_moq = self.moq[self.ref_ion]
-            if mode == "brho":
+            if (mode or "").lower() == "brho":
                 self.brho = brho
                 ref_frequency = self.ref_frequency * harmonic
             else:
@@ -300,8 +240,8 @@ class ImportData(object):
         moq_keys = list(self.moq.keys())
 
         # O(1) name -> yield lookup, built once, instead of an
-        # O(len(moq_keys) x len(particles_to_simulate)) nested scan --
-        # see docs/PERFORMANCE_BASELINE.md. "First match wins" is
+        # O(len(moq_keys) x len(particles_to_simulate)) nested scan.
+        # "First match wins" is
         # preserved deliberately (`if p_name not in yield_by_name`)
         # to match the original loop's `break`-on-first-match semantics
         # exactly, in case particles_to_simulate ever contains a
@@ -366,7 +306,7 @@ class ImportData(object):
             gamma = ImportData.gamma_ke(ke, aa, ref_mass)
         elif gam:
             gamma = gam
-        beta = ImportData.beta(gamma)  # pyright: ignore[reportPossiblyUnboundVariable]  -- see docs/OPEN_SCIENTIFIC_QUESTIONS.md #1
+        beta = ImportData.beta(gamma)  # pyright: ignore[reportPossiblyUnboundVariable]
         return ImportData.velocity(beta) / ring_circumference
 
     @staticmethod

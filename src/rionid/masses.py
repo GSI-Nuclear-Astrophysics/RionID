@@ -3,13 +3,10 @@
 Extracted from the vendored `barion` library (Xaratustrah, 2015-2016,
 GPL-3.0 -- you are also an upstream co-owner of that library) to keep only
 the subset RionID actually uses: AME2020 mass-table loading,
-the ionic-mass electron-binding correction (RionID-EPJA/main.tex Sec. 2.1,
-the f^(0) model, lines 198-200), and a minimal storage-ring circumference
+the ionic-mass electron-binding correction, and a minimal storage-ring circumference
 holder. The physical constants and electron-binding-energy table
 (`AMEData.ElBiEn`) below are copied verbatim from
-`external/barion/amedata.py` and must not be hand-edited -- see
-docs/AUTOMATIC_PID_REMOVAL_MAP.md (decisions #1-2) and REFACTORING_PLAN.md
-for the extraction rationale.
+`external/barion/amedata.py` and must not be hand-edited.
 """
 
 import os
@@ -23,7 +20,7 @@ class Ring:
 
     The upstream `barion.Ring` also carried `gamma_t`/`mag_rigidity`/
     `acceptance`/per-facility presets (`get_ring_dict`) -- confirmed unused
-    by RionID in docs/LEGACY_BEHAVIOUR.md, dropped here.
+    by RionID and were therefore dropped here.
     """
 
     def __init__(self, name, circumference):
@@ -35,10 +32,10 @@ class AMEData:
     """Loads and caches the AME2020 mass table.
 
     On construction, reads `~/.ame/ame.data`, downloading it first if
-    absent (network side effect, documented in docs/LEGACY_BEHAVIOUR.md).
+    absent.
     Also builds an index for O(1) (element name, mass number) lookup via
     `lookup()`, replacing the linear table scan that was an
-    O(N x table-size) hot spot -- see docs/PERFORMANCE_BASELINE.md.
+    O(N x table-size) hot spot.
     """
 
     AME_DATA_LINK = "https://www-nds.iaea.org/amdc/ame2020/mass_1.mas20.txt"
@@ -697,9 +694,7 @@ def get_ame_data():
 
     The AME table is immutable for the life of the process (it
     only changes if a user re-downloads it between runs), so re-parsing
-    on every `ImportData` construction is wasted work -- see
-    docs/PERFORMANCE_BASELINE.md, "AMEData() re-parses... on every
-    ImportData construction".
+    on every `ImportData` construction is wasted work.
     """
     global _ame_cache
     if _ame_cache is None:
@@ -711,8 +706,7 @@ def ionic_mass_u(ame_row, qq):
     """Ionic mass in u for an ion in charge state `qq`, given its AME
     table row.
 
-    Implements the manuscript's atomic-to-ionic mass correction
-    (RionID-EPJA/main.tex:198-200, Sec. 2.1): the ionic mass is the atomic
+    Implements the atomic-to-ionic mass correction: the ionic mass is the atomic
     mass minus the removed electrons' rest mass, plus the corresponding
     change in total electron binding energy divided by c^2. Ported
     verbatim from

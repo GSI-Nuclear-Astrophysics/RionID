@@ -2,6 +2,7 @@
 BEFORE any PyQt5 import happens anywhere in the test session -- this
 module is pytest's first import, so it goes here.
 """
+
 import os
 import sys
 
@@ -18,9 +19,7 @@ import pytest  # noqa: E402
 
 @pytest.fixture(scope="session")
 def qapp():
-    """A session-wide QApplication. Runs headlessly via the offscreen
-    platform plugin -- confirmed working without Xvfb during the Phase 0
-    audit (see docs/PERFORMANCE_BASELINE.md)."""
+    """A session-wide QApplication using Qt's headless offscreen platform."""
     from PyQt5.QtWidgets import QApplication
 
     app = QApplication.instance()

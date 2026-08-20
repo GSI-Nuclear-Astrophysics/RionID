@@ -3,13 +3,13 @@ subset of the vendored `barion` library RionID actually uses (ionic mass
 with the electron-binding correction, AME table loading/lookup).
 
 Golden nuclides: 12C6+ as a light, well-known cross-check, plus
-72Ge32+/74As33+/76Se34+ because they are the manuscript's own worked E143
-example (RionID-EPJA/main.tex). Expected values were computed via the
-still-vendored external.barion.particle.Particle during the design of this
-plan (docs/superpowers/plans/2026-08-19-wave2a-depid-masses-speed.md) --
-do not re-derive them from masses.py itself, that would make this test
+72Ge32+/74As33+/76Se34+ as representative highly charged ions. Expected
+values were computed via the former
+external.barion.particle.Particle implementation before it was removed.
+Do not re-derive them from masses.py itself; that would make this test
 vacuous.
 """
+
 import pytest
 
 from rionid.masses import get_ame_data, ionic_mass_u, ionic_moq_u
@@ -41,8 +41,7 @@ def test_ionic_mass_and_moq(ame, name, aa, qq, expected_mass, expected_moq):
 
 
 def test_get_ame_data_is_cached():
-    """The process-lifetime cache (docs/PERFORMANCE_BASELINE.md) must
-    return the SAME object on repeated calls, not re-parse."""
+    """The process cache must return the same object, not re-parse."""
     a = get_ame_data()
     b = get_ame_data()
     assert a is b

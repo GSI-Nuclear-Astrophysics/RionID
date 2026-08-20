@@ -24,9 +24,7 @@ appear, and lets you compare that against the data. **It does not do
 automatic or autonomous ion identification.** There is no automatic
 peak-to-ion assignment, no classifier, and no hidden ranking logic — every
 displayed candidate is one you asked for, and every accepted assignment is
-one you make yourself. See `docs/SCIENTIFIC_METHOD.md` for the physics and
-`docs/AUTOMATIC_PID_REMOVAL_MAP.md` for a record of automatic-matching
-functionality that was deliberately removed from this release.
+one you make yourself.
 
 ## Features
 
@@ -35,12 +33,10 @@ functionality that was deliberately removed from this release.
     frequencies from ionic mass-to-charge ratios and a user-specified
     reference ion, projected to any requested harmonics.
 *   **Polynomial residual correction:** an explicit, user-supplied
-    quadratic correction in revolution-frequency space (see
-    `docs/SCIENTIFIC_METHOD.md`), applied consistently across harmonics.
+    quadratic correction in revolution-frequency space, applied
+    consistently across harmonics.
 *   **Interactive spectrum overlay:** pan, zoom, and inspect candidate ion
     labels against 1D experimental spectra.
-*   **Signal processing:** peak detection with configurable threshold and
-    minimum distance.
 *   **Standalone:** bundles `lisereader` (GPL-3.0) for LISE++ candidate-list
     import without extra dependency management.
 
@@ -72,22 +68,26 @@ rionid
 ```
 Fill in a reference ion, momentum-compaction factor, exactly one
 reference-frequency value (frequency, Brho, kinetic energy, or gamma),
-a candidate list (LISE++ `.lpp` output), the ring circumference, and a
-spectrum file, then run the simulation from the window.
+a candidate list (LISE++ `.lpp` output), and a spectrum file, then run the
+simulation from the window. The GUI uses the ESR circumference of 108.36 m.
 
 `datafile.npz` needs `arr_0`/`arr_1` keys (frequency, amplitude) by
 default, or any two array keys mapped via the GUI's key-selection dialog.
 
-**A note on the `python3 -m rionid`/`rionid <datafile>` CLI path:** as
-currently implemented, this entry point requires a real LISE++
-candidate-list file via `-psim`/`--filep` (not optional in practice,
-despite argparse not marking it required) and has no way to supply a
-ring circumference at all — every reference-frequency mode currently
-crashes through this specific path. See
-`docs/OPEN_SCIENTIFIC_QUESTIONS.md` items 5-6 for the full evidence, and
-`docs/REPRODUCIBILITY.md` §3 for a verified, fully-working example that
-exercises the same underlying simulation engine directly, using only
-public/synthetic data.
+For command-line use, run `rionid-cli --help` or `python3 -m rionid
+--help`. The LISE++ candidate list, reference ion, momentum-compaction
+factor, and exactly one reference-frequency mode are required. The ring
+circumference defaults to the ESR value of 108.36 m and can be changed
+with `--circumference`.
+
+A small redistributable candidate list is included for testing the full
+CLI workflow:
+
+```bash
+python examples/quickstart.py
+rionid-cli quickstart_synthetic.npz -psim examples/candidates.lpp \
+  -r 72Ge32+ -ap 0.189 -f 1930000 -hrm 127
+```
 
 ## Parameter reference
 
@@ -97,14 +97,12 @@ public/synthetic data.
 | Reference ion | `-r`, `--refion` | e.g. `72Ge+32` — sets the frequency-model anchor |
 | Momentum compaction | `-ap`, `--alphap` | α_p; values `>1` are treated as γ_t and converted (`α_p = 1/γ_t²`) |
 | Candidate list | `-psim`, `--filep` | LISE++ output file |
+| Ring circumference | `--circumference` | Metres; defaults to ESR (108.36 m) |
 | Harmonics | `-hrm`, `--harmonics` | One or more harmonic orders to display |
 | Reference frequency mode | `-f`/`-b`/`-ke`/`-gam` | Exactly one of: frequency [Hz], Brho [Tm], kinetic energy [MeV/u], Lorentz γ |
 | Polynomial correction | `-c`, `--correct` | `A B C` coefficients (quadratic, linear, constant), Hz-based, `numpy.polyval` order |
 | Top-N filter | `-n`, `--nions` | Show only the N highest-yield candidates (reference ion always included) |
-| Highlight ions | (GUI field) | Comma-separated ion names to highlight — user-selected only, never automatically assigned |
-
-Full stage-by-stage documentation, including invariants and known quirks,
-is in `docs/LEGACY_BEHAVIOUR.md`.
+| Highlight ions | (GUI field) | Space- or comma-separated ion names to highlight — user-selected only, never automatically assigned |
 
 ## Supported formats
 
@@ -136,10 +134,8 @@ is in `docs/LEGACY_BEHAVIOUR.md`.
 ## Citation
 
 If you use RionID, please cite it as described in
-[`CITATION.cff`](CITATION.cff). Note: this repository currently has a
-known, unresolved discrepancy between the Zenodo concept DOI shown above
-and the one recorded in `CITATION.cff` — see
-`docs/PUBLICATION_TRACEABILITY.md` for details; it is tracked, not hidden.
+the repository's
+[`CITATION.cff`](https://github.com/GSI-Nuclear-Astrophysics/RionID/blob/master/CITATION.cff).
 
 ## Limitations
 
@@ -159,10 +155,6 @@ and the one recorded in `CITATION.cff` — see
 - This release performs no automatic or autonomous species assignment —
   see "Scope and non-goals" above.
 
-See `RionID-EPJA/main.tex` (the accompanying physics/methods manuscript,
-a companion work not distributed in this repository — see
-`docs/PUBLICATION_TRACEABILITY.md`) for the full validation discussion.
-
 ## Acknowledgements
 
 *   **Dr. RuiJiu Chen** for providing the C++ Time-of-Flight simulation code
@@ -173,4 +165,5 @@ a companion work not distributed in this repository — see
 ## License
 
 This project is licensed under the GNU General Public License v3.0. See
-the [LICENSE](LICENSE) file for details.
+the [LICENSE](https://github.com/GSI-Nuclear-Astrophysics/RionID/blob/master/LICENSE)
+file for details.

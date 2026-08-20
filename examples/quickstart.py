@@ -1,5 +1,4 @@
-"""Minimal, runnable RionID example using synthetic (non-experimental)
-data -- no real spectrum or candidate file needed.
+"""Runnable RionID example using synthetic, redistributable inputs.
 
 Run with: python examples/quickstart.py
 """
@@ -11,7 +10,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from rionid.core import ImportData
-from rionid.masses import get_ame_data, ionic_moq_u
 from tests.fixtures.synthetic_spectrum import make_synthetic_spectrum
 
 
@@ -20,32 +18,22 @@ def main():
     make_synthetic_spectrum(spectrum_path)
     print(f"Wrote synthetic spectrum to {spectrum_path}")
 
-    # 72Ge32+ (fully-stripped germanium-72) is the manuscript's own E143
-    # worked example (RionID-EPJA/main.tex). A single candidate equal to
-    # the reference ion isolates this demo to the frequency model and
-    # correction step, without needing a LISE++ candidate file -- see
-    # docs/REPRODUCIBILITY.md Section 3 for a full engine-driven example
-    # with a real AME2020 candidate list (the CLI's -psim path currently
-    # has known issues -- see docs/OPEN_SCIENTIFIC_QUESTIONS.md items 5-6).
+    # 72Ge32+ (fully stripped germanium-72) is the worked reference ion.
     ref_ion = "72Ge32+"
-    ame_row = get_ame_data().lookup("Ge", 72)
-    ref_moq = ionic_moq_u(ame_row, 32)
+    candidates_path = Path(__file__).resolve().parent / "candidates.lpp"
 
     model = ImportData(
         ref_ion, alphap=0.189, filename=spectrum_path, reload_data=True, circumference=108.36
     )
-    model.moq = {ref_ion: ref_moq}
-    model.ref_ion = ref_ion
-    model.ref_charge = 32
+    model._set_particles_to_simulate_from_file(candidates_path)
+    model._calculate_moqs()
     model._calculate_srrf(fref=1.93e6)
+    model._simulated_data(harmonics=[127.0], mode="frequency")
 
-    print(f"Reference ion {ref_ion}: m/q = {ref_moq} u")
+    print(f"Loaded {len(model.nuclei_names)} candidates from {candidates_path}")
+    print(f"Reference ion {ref_ion}: m/q = {model.moq[ref_ion]} u")
     print(f"Reference frequency: {model.ref_frequency} Hz")
-    print(f"srrf (relative revolution frequency): {model.srrf}")
-    print(
-        "For a full simulation with a real candidate list and CLI/GUI "
-        "usage, see docs/REPRODUCIBILITY.md."
-    )
+    print(f"Simulated harmonic 127 shape: {model.simulated_data_dict['127.0'].shape}")
 
 
 if __name__ == "__main__":

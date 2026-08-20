@@ -14,14 +14,12 @@ is not reconstructed here from git log; see the git tag history for that.
 - **Automatic ion identification ("Quick PID")**: the GUI panel that
   scanned a grid of (reference frequency × α_p) values and silently
   overwrote user-entered values with an automatic best-match result.
-  This directly contradicted the accompanying manuscript's claim that
-  RionID is "not an autonomous classifier" — removing it makes that claim
-  true of the shipped software. See `docs/AUTOMATIC_PID_REMOVAL_MAP.md`
-  for the full removal record.
+  Removing it keeps RionID's workflow deterministic and expert-guided.
 - **Baseline subtraction (BrPLS)**: the "Remove Baseline" feature and its
   `remove_baseline`/`psd_baseline_removed_l` parameters, per a deliberate
-  product-scope decision (not a physics fix). Peak detection itself is
-  unaffected and remains available.
+  product-scope decision (not a physics fix).
+- **Peak utilities**: peak detection, peak plotting, peak threshold and
+  matching-frequency controls were removed from the supported workflow.
 - Dead/unreachable code: `handle_tiqnpz_data`/`handle_prerionidnpz_data`
   I/O handlers, the vendored `barion` library's unused automatic-
   identification methods (`identify_range` and related), and several
@@ -29,15 +27,8 @@ is not reconstructed here from git log; see the git tag history for that.
 
 ### Changed
 
-- The subset of the vendored `barion` library RionID actually uses
-  (ionic-mass electron-binding correction, AME2020 table loading, a
-  minimal ring-circumference holder) is now `src/rionid/masses.py`,
-  extracted with the underlying arithmetic verified bit-identical to the
-  original. `external/barion/` is gone.
 - Two algorithmic hot paths are now O(N) instead of O(N×M)/O(N²):
-  candidate mass-to-charge lookup and simulated-data yield lookup — see
-  `docs/PERFORMANCE_BASELINE.md` for measured before/after numbers
-  (~100× and ~235× respectively at N=2000 candidates).
+  candidate mass-to-charge lookup and simulated-data yield lookup.
 - The AME2020 mass table is now cached for the process lifetime
   instead of being re-parsed on every simulation run.
 - `pyproject.toml` migrated to PEP 621 metadata; `pip install -e ".[dev]"`
@@ -45,14 +36,11 @@ is not reconstructed here from git log; see the git tag history for that.
 
 ### Added
 
-- A public pytest regression suite (19 tests) — there were none before
-  this release cycle. Covers the polynomial-correction physics against
-  the manuscript's own worked example, the extracted mass-table
-  arithmetic, GUI state/wiring after the removals above, and the two
-  speed-fixed hot paths' output identity.
+- A public pytest regression suite (27 default tests plus one slow test) — there were none before
+  this release cycle. Covers the polynomial-correction arithmetic, the
+  extracted mass-table arithmetic, GUI state/wiring after the removals
+  above, and the optimized analysis paths' output identity.
 - `ruff`/`pyright`/`pre-commit`/CI configuration.
-- `docs/SCIENTIFIC_METHOD.md`, `docs/REPRODUCIBILITY.md`,
-  `docs/OPEN_SCIENTIFIC_QUESTIONS.md`, `docs/JOSS_READINESS.md`.
 
 ### Fixed
 

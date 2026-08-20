@@ -36,7 +36,7 @@ jobs:
           key: ame-nubase-tables-v1
 
       - name: Lint (ruff check)
-        run: ruff check src/
+        run: ruff check src/ tests/
 
       - name: Format check (ruff format)
         run: ruff format --check src/
@@ -82,6 +82,7 @@ jobs:
           python -m venv /tmp/wheel-test-venv
           /tmp/wheel-test-venv/bin/pip install dist/*.whl
           /tmp/wheel-test-venv/bin/python -c "import rionid; from rionid.version import __version__; print(__version__)"
+          /tmp/wheel-test-venv/bin/rionid-cli --help > /dev/null
           /tmp/wheel-test-venv/bin/rionid --help > /dev/null 2>&1 || echo "rionid entry point resolved (GUI launch expectedly fails headless without QT_QPA_PLATFORM)"
 
       - uses: actions/upload-artifact@v4

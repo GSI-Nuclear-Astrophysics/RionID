@@ -17,13 +17,9 @@ def import_controller(
     mode=None,
     value=None,
     reload_data=None,
-    peak_threshold_pct=0.05,
-    min_distance=10,
     highlight_ions=None,
     io_params=None,
     sim_scalingfactor=None,
-    matching_freq_min=None,
-    matching_freq_max=None,
     correct=None,
 ):
     """
@@ -63,10 +59,6 @@ def import_controller(
     reload_data : bool, optional
         If True, reloads experimental data from the raw file; otherwise loads
         from the cached .npz.
-    peak_threshold_pct : float, optional
-        Relative threshold for peak detection (0.0 to 1.0). Default is 0.05 (5%).
-    min_distance : float, optional
-        Minimum distance (in data points) between detected peaks.
     highlight_ions : str, optional
         Comma-separated string of ion names to highlight in the plot (e.g., '72Ge+35, 74Se+34').
     io_params : dict, optional
@@ -74,10 +66,6 @@ def import_controller(
         histogram names for ROOT files).
     sim_scalingfactor : float, optional
         Factor to scale the simulated yield/amplitude.
-    matching_freq_min : float, optional
-        Minimum frequency (Hz) bound for the peak matching algorithm.
-    matching_freq_max : float, optional
-        Maximum frequency (Hz) bound for the peak matching algorithm.
     correct : list of float, optional
         Coefficients [a0, a1, a2] for a second-order polynomial correction
         applied to the simulated frequencies.
@@ -111,10 +99,6 @@ def import_controller(
             reload_data=reload_data,
             circumference=circumference,
             highlight_ions=highlight_ions,
-            peak_threshold_pct=peak_threshold_pct,
-            min_distance=min_distance,
-            matching_freq_min=matching_freq_min,
-            matching_freq_max=matching_freq_max,
             io_params=io_params,
         )
 
@@ -243,11 +227,11 @@ def save_simulation_results(mydata, mode, harmonics, sort_index, filename="simul
             if mode == "Frequency":
                 fre = mydata.srrf[i] * mydata.ref_frequency
             elif mode == "Brho":
-                fre = mydata.srrf[i] * mydata.ref_frequency * harmonic  # pyright: ignore[reportPossiblyUnboundVariable]  -- see docs/OPEN_SCIENTIFIC_QUESTIONS.md #4
+                fre = mydata.srrf[i] * mydata.ref_frequency * harmonic  # pyright: ignore[reportPossiblyUnboundVariable]
             yield_ = mydata.yield_data[i]
             moq = mydata.moq[ion]
             mass_u = mydata.total_mass[ion]
             mass = AMEData.to_mev(mass_u) * 1e6
-            result_line = f"{ion:<15}{fre:<30.10f}{yield_:<15.4e}{moq:<15.12f}{mass:<15.3f}"  # pyright: ignore[reportPossiblyUnboundVariable]  -- see docs/OPEN_SCIENTIFIC_QUESTIONS.md #4
+            result_line = f"{ion:<15}{fre:<30.10f}{yield_:<15.4e}{moq:<15.12f}{mass:<15.3f}"  # pyright: ignore[reportPossiblyUnboundVariable]
             logger.info(result_line)
             file.write(result_line + "\n")

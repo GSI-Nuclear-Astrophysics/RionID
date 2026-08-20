@@ -1,8 +1,5 @@
-"""Golden-output regression tests for the O(N)/O(N^2) hot paths identified
-in docs/PERFORMANCE_BASELINE.md. These tests capture output BEFORE the
-speed fix in this task lands and must still pass, UNMODIFIED, after --
-proving the fix is output-preserving, not just faster.
-"""
+"""Golden-output regression tests for optimized analysis paths."""
+
 import numpy as np
 import pytest
 
@@ -20,8 +17,10 @@ def _make_model(ame_table, synthetic_spectrum_path, n):
     candidates = build_ame_candidates(ame_table, n)
     ref_name, ref_aa, ref_zz = candidates[0][0], candidates[0][1], candidates[0][2]
     model = ImportData(
-        f"{ref_aa}{ref_name}{ref_zz}+", alphap=0.189,
-        filename=synthetic_spectrum_path, reload_data=True,
+        f"{ref_aa}{ref_name}{ref_zz}+",
+        alphap=0.189,
+        filename=synthetic_spectrum_path,
+        reload_data=True,
         circumference=108.36,
     )
     model.ame = get_ame_data()
@@ -50,8 +49,7 @@ def test_simulated_data_yield_lookup_output(ame_table, synthetic_spectrum_path, 
     model = _make_model(ame_table, synthetic_spectrum_path, n)
     candidates = build_ame_candidates(ame_table, n)
     expected_yield_by_ion = {
-        f"{aa}{name}{charges[-1]}+": yield_
-        for name, aa, zz, nn, charges, yield_ in candidates
+        f"{aa}{name}{charges[-1]}+": yield_ for name, aa, zz, nn, charges, yield_ in candidates
     }
     model._calculate_moqs()
     model._calculate_srrf(fref=1.93e6)
@@ -69,9 +67,7 @@ def test_simulated_data_yield_lookup_output(ame_table, synthetic_spectrum_path, 
 
 @pytest.mark.slow
 def test_simulated_data_yield_lookup_output_n2000(ame_table, synthetic_spectrum_path):
-    """Larger-N variant matching docs/PERFORMANCE_BASELINE.md's scale.
-    Not run by default (see pyproject.toml's pytest markers) -- run
-    explicitly with `pytest -m slow` when re-measuring performance."""
+    """Larger-N variant, run explicitly with ``pytest -m slow``."""
     model = _make_model(ame_table, synthetic_spectrum_path, 2000)
     model._calculate_moqs()
     model._calculate_srrf(fref=1.93e6)

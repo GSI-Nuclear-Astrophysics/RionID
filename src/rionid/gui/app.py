@@ -46,13 +46,10 @@ class MainWindow(QWidget):
         # Create a QSplitter to hold both the input and the visualization
         splitter = QSplitter(Qt.Horizontal)
 
-        # Create Visualization Widget FIRST
-        # We must create this first because rion_input needs a reference to it
-        # to handle the 'Pick' cursor events.
+        # Create the visualization before the input panel.
         self.visualization_widget = CreatePyGUI()
 
-        # 2. Create Input Widget
-        # Pass the plot widget so inputs can trigger cursor picking
+        # Create the input widget and connect it to the visualization.
         self.rion_input = RionID_GUI(plot_widget=self.visualization_widget)
 
         # Add widgets to the splitter

@@ -26,13 +26,12 @@ particle-identification tool — see the README's "Scope and non-goals"
 section. Contributions that reintroduce automatic species assignment,
 hidden heuristics, or silent peak-to-ion matching will not be accepted;
 the deterministic, user-guided workflow is a deliberate design decision,
-not an oversight. See `docs/AUTOMATIC_PID_REMOVAL_MAP.md` for the
-rationale.
+not an oversight.
 
 Changes to `src/rionid/core.py`'s `_calculate_srrf` (the polynomial
-correction) or any other physics/numerical behavior require the
-manuscript's (`RionID-EPJA/main.tex`) formalism as the reference — open an
-issue to discuss before submitting a PR that changes numerical output.
+correction) or any other physics/numerical behavior require focused
+regression tests and scientific review — open an issue before submitting a
+PR that changes numerical output.
 
 ## Versioning
 

@@ -2,14 +2,15 @@ import re
 
 import numpy as np
 import pyqtgraph as pg
-from PyQt5.QtCore import QLoggingCategory, Qt, pyqtSignal
-from PyQt5.QtGui import QFont
+from PyQt5.QtCore import QLoggingCategory, Qt
+from PyQt5.QtGui import QClipboard, QFont
 from PyQt5.QtWidgets import (
+    QApplication,
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMenu,
     QPushButton,
-    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -39,18 +40,89 @@ class CustomLegendItem(pg.LegendItem):
         super().paint(p, *args)
 
 
+class FrequencyMarker(pg.InfiniteLine):
+    """Movable frequency marker with copy/remove actions."""
+
+    def __init__(
+        self,
+        marker_id,
+        frequency_mhz,
+        remove_callback,
+        selection_callback,
+        position_callback,
+        copied_callback,
+    ):
+        super().__init__(
+            pos=frequency_mhz,
+            angle=90,
+            movable=True,
+            pen=pg.mkPen("#ffd700", width=2),
+            hoverPen=pg.mkPen("#ffffff", width=3),
+        )
+        self.marker_id = marker_id
+        self.remove_callback = remove_callback
+        self.selection_callback = selection_callback
+        self.position_callback = position_callback
+        self.copied_callback = copied_callback
+        self.selected = False
+        self.frequency_label = pg.InfLineLabel(
+            self, self._label_text(), position=0.95, color="#ffd700"
+        )
+        self.sigPositionChanged.connect(self._position_changed)
+
+    def _label_text(self):
+        return f"M{self.marker_id}: {float(self.value()):.9f} MHz"
+
+    def _position_changed(self):
+        self.frequency_label.setText(self._label_text())
+
+        self.position_callback()
+
+    def set_selected(self, selected):
+        self.selected = selected
+        color = "#00e5ff" if selected else "#ffd700"
+        self.setPen(pg.mkPen(color, width=3 if selected else 2))
+        self.frequency_label.setColor(color)
+
+    def copy_frequency_hz(self):
+        text = f"{float(self.value()) * 1e6:.3f} Hz"
+        QApplication.clipboard().setText(text, QClipboard.Clipboard)
+        QApplication.processEvents()
+        self.copied_callback(text)
+        return text
+
+    def mouseClickEvent(self, ev):
+        if ev.button() == Qt.LeftButton:
+            self.selection_callback(self)
+            super().mouseClickEvent(ev)
+            return
+        if ev.button() != Qt.RightButton:
+            super().mouseClickEvent(ev)
+            return
+
+        menu = QMenu()
+        copy_action = menu.addAction("Copy frequency (Hz)")
+        remove_action = menu.addAction("Remove marker")
+        selected = menu.exec_(ev.screenPos().toPoint())
+        if selected == copy_action:
+            self.copy_frequency_hz()
+        elif selected == remove_action:
+            self.remove_callback(self)
+        ev.accept()
+
+
 class CreatePyGUI(QMainWindow):
     """
     The main visualization widget for RionID.
     """
 
-    plotClicked = pyqtSignal()
-
     def __init__(self, exp_data=None, sim_data=None):
         super().__init__()
         self.saved_x_range = None
         self.simulated_items = []
-        self.red_triangles = None
+        self.frequency_markers = []
+        self.selected_markers = []
+        self.next_marker_id = 1
         self.exp_data_curve = None
         self.font_size = 14
 
@@ -62,10 +134,7 @@ class CreatePyGUI(QMainWindow):
         self.z_exp = np.array([])
 
         self.setup_ui()
-        self.plot_widget.scene().sigMouseClicked.connect(self.on_click)
-
-    def on_click(self, event):
-        self.plotClicked.emit()
+        self.plot_widget.scene().sigMouseClicked.connect(self._plot_clicked)
 
     def setup_ui(self):
         self.setWindowTitle("Schottky Signals Identifier")
@@ -97,6 +166,9 @@ class CreatePyGUI(QMainWindow):
         self.cursor_pos_label = QLabel(self)
         self.cursor_pos_label.setStyleSheet("color: black; font-weight: bold;")
         main_layout.addWidget(self.cursor_pos_label)
+        self.marker_info_label = QLabel("Select two markers to measure Δf", self)
+        self.marker_info_label.setStyleSheet("color: black; font-weight: bold;")
+        main_layout.addWidget(self.marker_info_label)
         self.proxy = pg.SignalProxy(
             self.plot_widget.scene().sigMouseMoved, rateLimit=60, slot=self.mouse_moved
         )
@@ -156,24 +228,8 @@ class CreatePyGUI(QMainWindow):
         self.plot_widget.addItem(self.exp_data_curve)
         self.legend.addItem(self.exp_data_curve, "Experimental Data")
 
-        # Plot Peaks
-        if hasattr(data, "peak_freqs") and len(data.peak_freqs) > 0:
-            peak_h = self._sanitize_positive(data.peak_heights)
-
-            self.red_triangles = self.plot_widget.plot(
-                data.peak_freqs * 1e-6,
-                peak_h,
-                pen=None,
-                symbol="t1",
-                symbolBrush="#d62728",
-                symbolPen="k",
-                symbolSize=10,
-            )
-            self.legend.addItem(self.red_triangles, "Detected Peaks")
-
     def plot_simulated_data(self, data):
-        # PERFORMANCE NOTE (see docs/PERFORMANCE_BASELINE.md): profiling
-        # at N=2000 candidates shows this method dominated not by
+        # Profiling at N=2000 candidates shows this method dominated not by
         # pg.TextItem construction itself (~0.14ms/item) but by
         # PyQtGraph's addItem/removeItem scene-graph reparenting overhead
         # (itemChange/changeParent/signal connect-disconnect), triggered
@@ -184,10 +240,7 @@ class CreatePyGUI(QMainWindow):
         # new (harmonic, ion) label set and correctly handling ions that
         # change highlight/reference status between redraws (their
         # colour must update, not just position/text). That correctness
-        # cannot be verified visually in this environment (no display
-        # server) and was deliberately NOT attempted here -- see
-        # docs/superpowers/plans/2026-08-19-wave2a-depid-masses-speed.md
-        # Task 9. Revisit once you can visually QA it.
+        # needs visual QA before implementation.
         self.simulated_data = data.simulated_data_dict
         refion = data.ref_ion
         highlights = data.highlight_ions or []
@@ -329,7 +382,84 @@ class CreatePyGUI(QMainWindow):
         pos = evt[0]
         if self.plot_widget.sceneBoundingRect().contains(pos):
             mousePoint = self.plot_widget.plotItem.vb.mapSceneToView(pos)
-            self.cursor_pos_label.setText(f"Cursor: {mousePoint.x():.4f} MHz")
+            self.cursor_pos_label.setText(self._format_cursor_position(mousePoint.x()))
+
+    @staticmethod
+    def _format_cursor_position(frequency_mhz):
+        """Format MHz with enough decimal places to resolve millihertz."""
+        return f"Cursor: {frequency_mhz:.9f} MHz"
+
+    def _plot_clicked(self, event):
+        if event.button() != Qt.LeftButton or not event.double():
+            return
+        if not self.plot_widget.sceneBoundingRect().contains(event.scenePos()):
+            return
+        point = self.plot_widget.plotItem.vb.mapSceneToView(event.scenePos())
+        self.add_frequency_marker(point.x())
+        event.accept()
+
+    def add_frequency_marker(self, frequency_mhz):
+        marker = FrequencyMarker(
+            self.next_marker_id,
+            frequency_mhz,
+            self.remove_frequency_marker,
+            self.toggle_marker_selection,
+            self.update_marker_measurement,
+            self.show_copy_confirmation,
+        )
+        self.next_marker_id += 1
+        self.frequency_markers.append(marker)
+        self.plot_widget.addItem(marker)
+        return marker
+
+    def remove_frequency_marker(self, marker):
+        if marker in self.frequency_markers:
+            if marker in self.selected_markers:
+                self.selected_markers.remove(marker)
+            self.frequency_markers.remove(marker)
+            self.plot_widget.removeItem(marker)
+            self.update_marker_measurement()
+
+    def clear_frequency_markers(self):
+        for marker in list(self.frequency_markers):
+            self.remove_frequency_marker(marker)
+
+    def toggle_marker_selection(self, marker):
+        if marker in self.selected_markers:
+            self.selected_markers.remove(marker)
+            marker.set_selected(False)
+        else:
+            if len(self.selected_markers) == 2:
+                oldest = self.selected_markers.pop(0)
+                oldest.set_selected(False)
+            self.selected_markers.append(marker)
+            marker.set_selected(True)
+        self.update_marker_measurement()
+
+    def update_marker_measurement(self):
+        if len(self.selected_markers) != 2:
+            self.marker_info_label.setText("Select two markers to measure Δf")
+            return
+        first, second = self.selected_markers
+        delta_hz = abs(float(second.value()) - float(first.value())) * 1e6
+        self.marker_info_label.setText(
+            f"Δf M{first.marker_id} ↔ M{second.marker_id}: {delta_hz:.3f} Hz"
+        )
+
+    def copy_selected_markers(self):
+        if not self.selected_markers:
+            self.marker_info_label.setText("Select a marker before copying")
+            return ""
+        text = "\n".join(
+            f"{float(marker.value()) * 1e6:.3f} Hz" for marker in self.selected_markers
+        )
+        QApplication.clipboard().setText(text, QClipboard.Clipboard)
+        QApplication.processEvents()
+        self.show_copy_confirmation(text)
+        return text
+
+    def show_copy_confirmation(self, text):
+        self.marker_info_label.setText(f"Copied: {text.replace(chr(10), ', ')}")
 
     def updateData(self, data):
         self.plot_all_data(data)
@@ -348,10 +478,6 @@ class CreatePyGUI(QMainWindow):
             self.plot_widget.removeItem(self.exp_data_curve)
             self.exp_data_curve = None
 
-        if self.red_triangles:
-            self.plot_widget.removeItem(self.red_triangles)
-            self.red_triangles = None
-
     def reset_view(self):
         if self.saved_x_range:
             self.plot_widget.setXRange(*self.saved_x_range, padding=0.02)
@@ -366,20 +492,28 @@ class CreatePyGUI(QMainWindow):
     def add_buttons(self, main_layout):
         layout = QHBoxLayout()
 
-        font_spin = QSpinBox()
-        font_spin.setRange(8, 30)
-        font_spin.setValue(self.font_size)
-        font_spin.valueChanged.connect(self.update_fonts)
+        self.reset_view_button = QPushButton("Reset View")
+        self.reset_view_button.setFont(QFont("Arial", 12))
+        self.reset_view_button.setStyleSheet(
+            "QPushButton { background-color: #bbdefb; color: black; }"
+        )
+        self.reset_view_button.clicked.connect(self.reset_view)
+        layout.addWidget(self.reset_view_button)
 
-        lbl = QLabel("Font Size:")
-        lbl.setFont(QFont("Arial", 12))
+        self.copy_markers_button = QPushButton("Copy Selected")
+        self.copy_markers_button.setFont(QFont("Arial", 12))
+        self.copy_markers_button.setStyleSheet(
+            "QPushButton { background-color: #c8e6c9; color: black; }"
+        )
+        self.copy_markers_button.clicked.connect(self.copy_selected_markers)
+        layout.addWidget(self.copy_markers_button)
 
-        layout.addWidget(lbl)
-        layout.addWidget(font_spin)
-
-        reset_btn = QPushButton("Reset View")
-        reset_btn.setFont(QFont("Arial", 12))
-        reset_btn.clicked.connect(self.reset_view)
-        layout.addWidget(reset_btn)
+        self.clear_markers_button = QPushButton("Clear Markers")
+        self.clear_markers_button.setFont(QFont("Arial", 12))
+        self.clear_markers_button.setStyleSheet(
+            "QPushButton { background-color: #fff9c4; color: black; }"
+        )
+        self.clear_markers_button.clicked.connect(self.clear_frequency_markers)
+        layout.addWidget(self.clear_markers_button)
 
         main_layout.addLayout(layout)

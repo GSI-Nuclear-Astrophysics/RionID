@@ -20,7 +20,6 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=2.0.2,<3",
-    "scipy>=1.10.1,<2",
     "PyQt5>=5.15.9,<6",
     "pyqtgraph>=0.13.3,<0.14",
     "loguru>=0.7.0,<0.8",
@@ -38,6 +37,7 @@ Documentation = "https://gsi-nuclear-astrophysics.github.io/rionid/"
 
 [project.scripts]
 rionid = "rionid.gui.app:main"
+rionid-cli = "rionid.__main__:main"
 
 [project.optional-dependencies]
 dev = [
@@ -93,10 +93,8 @@ typeCheckingMode = "standard"
 # (Qt enum access patterns valid at runtime via SIP but not modeled by
 # the bundled stubs; pyqtgraph's dynamically-assigned attributes;
 # Optional-attribute narrowing pyright can't see across methods) rather
-# than real bugs -- confirmed during JOSS-packaging planning by manually
-# categorizing every one of the ~60 findings these rules produced.
-# reportPossiblyUnboundVariable stays enabled: it is what caught the
-# real, pre-existing issues now logged in docs/OPEN_SCIENTIFIC_QUESTIONS.md.
+# than real bugs, based on manual review of the reported findings.
+# reportPossiblyUnboundVariable stays enabled to catch real control-flow issues.
 reportOptionalMemberAccess = false
 reportOptionalIterable = false
 reportArgumentType = false

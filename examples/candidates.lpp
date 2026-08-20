@@ -1,0 +1,6 @@
+# Minimal synthetic LISE++-style candidate list for the public examples.
+# It retrieves information after the [Calculations] blocks from LISE++.
+[Calculations]
+72Ge 32 =1.0
+70Se 32 =0.8
+71Ga 31 =0.6

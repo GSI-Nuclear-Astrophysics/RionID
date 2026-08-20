@@ -50,7 +50,7 @@ plugins:
 
 nav:
   - Home: index.md
-  - Documentation: reference/
+  - API reference: reference/
 
 extra:
   social:

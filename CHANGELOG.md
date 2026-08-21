@@ -4,7 +4,14 @@ All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this
 project uses [Semantic Versioning](https://semver.org/).
 
-## [9.0.0] - Unreleased
+## [9.0.1] - 2026-08-21
+
+### Fixed
+
+- Removed the obsolete Python `<3.13` package-metadata restriction so
+  RionID can be installed on Python 3.13 and 3.14.
+
+## [9.0.0] - 2026-08-21
 
 Breaking changes to the public API and CLI. Earlier history (4.0.0-8.0.0)
 is not reconstructed here from git log; see the git tag history for that.

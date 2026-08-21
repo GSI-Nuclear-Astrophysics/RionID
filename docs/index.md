@@ -47,11 +47,7 @@ one you make yourself.
 ```bash
 pip install rionid
 ```
-As of this writing, PyPI serves the pre-9.0.0 release line (the most
-recent published version does not yet include this release's removals
-of automatic ion identification and baseline subtraction — see the
-"Scope and non-goals" section above). Install from source below for the
-current `9.0.0` behavior until a 9.0.0 release is published.
+PyPI serves the latest release.
 
 ### From source (development)
 

@@ -40,3 +40,7 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # PyPI distributions are immutable. This also lets a rerun finish
+          # cleanly when an earlier attempt uploaded only part of a release.
+          skip-existing: true

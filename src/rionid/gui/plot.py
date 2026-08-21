@@ -265,6 +265,15 @@ class CreatePyGUI(QMainWindow):
             # Arrays for bulk plotting (Vectorization)
             bulk_freqs = []
             bulk_yields = []
+            finite_yields = []
+            for entry in sdata:
+                try:
+                    candidate_yield = float(entry[1])
+                except (ValueError, TypeError):
+                    continue
+                if np.isfinite(candidate_yield) and candidate_yield > 1.1e-9:
+                    finite_yields.append(candidate_yield)
+            visible_reference_yield = max(finite_yields, default=1.0)
 
             # Generate a unique color for this harmonic
             color = color_cycle[i % len(color_cycle)]
@@ -283,6 +292,12 @@ class CreatePyGUI(QMainWindow):
 
                 is_highlight = label in highlights
                 is_ref = label == refion
+
+                # A missing LISE++ yield is represented by the log-safety
+                # floor. Keep the reference anchor visible at the tallest
+                # candidate height instead of drawing it at 1e-9.
+                if is_ref and yield_value <= 1.1e-9:
+                    yield_value = visible_reference_yield
 
                 # Determine Style
                 width = style = None  # only read under is_highlight/is_ref, set below
@@ -314,12 +329,15 @@ class CreatePyGUI(QMainWindow):
                 self.plot_widget.addItem(text_item)
 
                 if is_highlight or is_ref:
-                    # Plot SPECIAL lines individually (so they draw on top with specific styles)
-                    line = self.plot_widget.plot(
+                    # Use the same direct PlotCurveItem path as ordinary
+                    # ions. plot_widget.plot() applies log handling
+                    # differently and displaced reference/highlight lines.
+                    line = pg.PlotCurveItem(
                         [freq, freq],
                         [1e-9, yield_value],
                         pen=pg.mkPen(color=c, width=width, style=style),
                     )
+                    self.plot_widget.addItem(line)
                     self.simulated_items.append((line, text_item))
                 else:
                     # Add STANDARD lines to bulk arrays for optimization

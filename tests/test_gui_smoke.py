@@ -3,6 +3,8 @@ wiring, not screenshots. Runs headlessly via QT_QPA_PLATFORM=offscreen
 (tests/conftest.py sets this before any PyQt5 import).
 """
 
+import pytest
+
 
 def test_quick_pid_surface_is_absent(qapp):
     """No automatic-PID controls, methods, or signals may exist."""
@@ -209,9 +211,27 @@ def test_plot_simulated_data_label_count_and_text(qapp, synthetic_spectrum_path)
     model._calculate_srrf(fref=1.93e6)
     model._simulated_data(harmonics=[127.0], mode="Frequency")
 
+    reference_index = list(model.nuclei_names).index(model.ref_ion)
+    simulated = model.simulated_data_dict["127.0"]
+    simulated[reference_index, 1] = 0.0
+    expected_reference_height = max(float(row[1]) for row in simulated) * 1.05
+
     win = CreatePyGUI()
     win.plot_all_data(model)
 
     labels = [item.toPlainText() for (_line, item) in win.simulated_items if item is not None]
     assert len(labels) == 10
     assert all(labels)  # every label is non-empty text
+
+    reference_line, reference_label = next(
+        (line, item)
+        for (line, item) in win.simulated_items
+        if item is not None
+        and item.toPlainText()
+        == win.to_superscript(str(ref_aa)) + ref_name + win.to_superscript(str(ref_zz)) + "⁺"
+    )
+    assert reference_label.pos().y() == pytest.approx(expected_reference_height)
+    reference_height = expected_reference_height / 1.05
+    assert type(reference_line).__name__ == "PlotCurveItem"
+    assert reference_line.yData[0] == pytest.approx(1e-9)
+    assert reference_line.yData[1] == pytest.approx(reference_height)

@@ -1,6 +1,6 @@
 [project]
 name = "rionid"
-version = "9.0.0"
+version = "9.0.1"
 description = "Ring-stored ion IDentification: A pure Python tool for Schottky spectrum analysis."
 authors = [
     {name = "David Freire-Fernández", email = "D.FreireFernandez@gsi.de"},

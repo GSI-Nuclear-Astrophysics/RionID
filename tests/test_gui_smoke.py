@@ -136,10 +136,10 @@ def test_input_labels_and_fixed_gui_circumference(qapp):
     assert {
         "Experimental data (.npz):",
         "LISE++ file (.lpp):",
-        "Momentum compaction factor (~0.51):",
-        "Harmonics (211 212 213):",
-        "Reference ion (72Ge32+):",
-        "Ions to highlight (72Ge31+ 72Ge30+):",
+        "Momentum compaction:",
+        "Harmonics:",
+        "Reference ion:",
+        "Highlight ions:",
     } <= labels
     assert not hasattr(panel, "circumference_edit")
     assert GUI_RING_CIRCUMFERENCE_M == 108.36

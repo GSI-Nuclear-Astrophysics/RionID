@@ -5,6 +5,7 @@ import sys
 import numpy as np
 from numpy import array, polyval, sqrt, stack
 
+from rionid.candidates import ion_from_ame, mass_metadata, parse_ion, search_moq, split_ions
 from rionid.external.lisereader.reader import LISEreader
 from rionid.io import handle_spectrumnpz_data
 from rionid.masses import AMEData, Ring, get_ame_data, ionic_moq_u
@@ -34,6 +35,9 @@ class ImportData(object):
         Ions to highlight in the plot.
     io_params : dict, optional
         Extra parameters for file I/O (e.g., NPZ keys).
+    write_cache : bool, optional
+        Whether a reload writes a cache beside the input (default True).
+        Saved-run workflows disable this to keep their inputs unchanged.
     """
 
     def __init__(
@@ -45,6 +49,7 @@ class ImportData(object):
         circumference=None,
         highlight_ions=None,
         io_params=None,
+        write_cache=True,
     ):
 
         self.simulated_data_dict = {}
@@ -53,6 +58,14 @@ class ImportData(object):
         self.protons = dict()
         self.total_mass = dict()
         self.yield_data = []
+        self.candidate_metadata = {}
+        self.lise_import_summary = {}
+        self.skipped_lise_candidates = []
+        self.frequency_uncertainties = {}
+        self.display_filter = ""
+        self.show_uncertainties = False
+        self.frequency_scale_hz_per_100kev = None
+        self.uncertainty_harmonic = 1.0
 
         self.highlight_ions = self._parse_highlight_ions(highlight_ions)
         self.alphap = alphap
@@ -71,7 +84,8 @@ class ImportData(object):
         if filename is not None:
             if reload_data:
                 self._get_experimental_data(filename)
-                self._save_experimental_data()
+                if write_cache:
+                    self._save_experimental_data()
             else:
                 try:
                     self._load_experimental_data()
@@ -96,6 +110,13 @@ class ImportData(object):
                 self.experimental_data = (freq, amp)
 
     def _parse_ref_ion(self, refion):
+        try:
+            ion = parse_ion(refion)
+            self.ref_aa, self.ref_el, self.ref_charge = ion.A, ion.element, ion.q
+            self.ref_ion = ion.name
+            return
+        except ValueError:
+            pass
         # Regex to extract Mass(Digits), Element(Letters), Charge(Digits)
         # It handles both '98Zr+39' and '98Zr39+' inputs
         match = re.match(r"(\d+)([a-zA-Z]+).*?(\d+)", self.ref_ion)
@@ -163,13 +184,17 @@ class ImportData(object):
                 "Cached data file not found. Please set reload_data to True to generate it."
             )
 
-    def _set_particles_to_simulate_from_file(self, particles_to_simulate):
+    def _set_particles_to_simulate_from_file(self, particles_to_simulate, *, load_masses=True):
         """Parses the LISE++ output file and loads the (process-cached)
-        AME table -- see rionid.masses.get_ame_data."""
-        self.ame = get_ame_data()
-        self.ame_data = self.ame.ame_table
-        lise = LISEreader(particles_to_simulate)
+        AME table -- see rionid.masses.get_ame_data. Replay can skip the
+        AME lookup when it restores resolved ionic inputs from a snapshot."""
+        if load_masses:
+            self.ame = get_ame_data()
+            self.ame_data = self.ame.ame_table
+        lise = LISEreader(particles_to_simulate, validate_masses=load_masses)
         self.particles_to_simulate = lise.get_info_all()
+        self.lise_import_summary = dict(lise.summary)
+        self.skipped_lise_candidates = list(lise.skipped_entries)
 
     def _calculate_moqs(self):
         """Calculates mass-to-charge ratios for every candidate in
@@ -178,6 +203,7 @@ class ImportData(object):
         """
         self.moq = dict()
         self.total_mass = dict()
+        self.candidate_metadata = {}
 
         for particle in self.particles_to_simulate:
             ion_name = f"{particle[1]}{particle[0]}{particle[4][-1]}+"
@@ -189,6 +215,102 @@ class ImportData(object):
             self.moq[ion_name] = m_q
             self.total_mass[ion_name] = m_q * qq
             self.protons[ion_name] = ame_row[4]
+            self.candidate_metadata[ion_name] = mass_metadata(ame_row, "lise")
+
+    def _extend_candidates(
+        self, manual_ions="", search_ion="", tolerance_percent=1.0, charge_min=1, charge_max=None
+    ):
+        ame = getattr(self, "ame", None)
+        if ame is None:
+            self.ame = ame = get_ame_data()
+        for name in split_ions(manual_ions):
+            ion, row, mass = ion_from_ame(name, ame)
+            self._add_candidate(ion.name, mass / ion.q, mass, ion.Z, mass_metadata(row, "manual"))
+        if search_ion:
+            self.search_results = search_moq(
+                search_ion, tolerance_percent, charge_min, charge_max, ame
+            )
+            for entry in self.search_results:
+                self._add_candidate(
+                    entry["ion"],
+                    entry["moq_u_per_e"],
+                    entry["mass_u"],
+                    entry["Z"],
+                    {
+                        k: entry[k]
+                        for k in (
+                            "source",
+                            "sources",
+                            "mass_uncertainty_keV",
+                            "mass_extrapolated",
+                            "relative_yield_known",
+                        )
+                    },
+                )
+        if self.ref_ion not in self.moq:
+            ion, row, mass = ion_from_ame(self.ref_ion, ame)
+            self._add_candidate(
+                ion.name, mass / ion.q, mass, ion.Z, mass_metadata(row, "reference")
+            )
+
+    def _add_candidate(self, name, moq, mass, z, metadata):
+        if name in self.moq:
+            old = self.candidate_metadata.setdefault(name, dict(metadata))
+            old["sources"] = list(
+                dict.fromkeys(old.get("sources", [old["source"]]) + metadata["sources"])
+            )
+            return
+        self.moq[name], self.total_mass[name], self.protons[name] = moq, mass, z
+        self.candidate_metadata[name] = dict(metadata)
+
+    def _mass_frequency_uncertainties(self):
+        """Propagate AME mass errors, conditional on the supplied frequency model.
+
+        The polynomial, electronics and measured reference-frequency uncertainty
+        are held fixed. Mass errors for charge states of one nuclide are shared.
+        """
+        metadata = getattr(self, "candidate_metadata", {})
+        out = {}
+        ref_sigma = metadata.get(self.ref_ion, {}).get("mass_uncertainty_keV")
+        try:
+            reference = parse_ion(self.ref_ion)
+        except ValueError:
+            return {name: None for name in self.moq}
+        mu_ref = self.moq[self.ref_ion]
+        ref_dfdmu = 0.0
+        if getattr(self, "_reference_mode", "Frequency") == "Brho":
+            gamma = self.gamma_brho(self._reference_brho, self.ref_charge, self.ref_mass)
+            ref_dfdmu = -self.ref_frequency / (gamma**2 * mu_ref)
+        elif getattr(self, "_reference_mode", "Frequency") == "Kinetic Energy":
+            gamma = self.gamma_ke(self._reference_ke, self.ref_aa, self.ref_mass)
+            ref_dfdmu = -self.ref_frequency / (mu_ref * gamma * (gamma + 1))
+        scale = getattr(self, "frequency_scale_hz_per_100kev", None)
+        for index, name in enumerate(self.moq):
+            sigma = metadata.get(name, {}).get("mass_uncertainty_keV")
+            if sigma is None:
+                out[name] = None
+                continue
+            ion = parse_ion(name)
+            if scale is not None:
+                out[name] = sigma * scale / (100 * self.uncertainty_harmonic)
+                continue
+            if ref_sigma is None:
+                out[name] = None
+                continue
+            mu = self.moq[name]
+            target_grad = -self.alphap * self.ref_frequency / mu_ref
+            reference_grad = (
+                self.alphap * self.ref_frequency * mu / mu_ref**2
+                + ref_dfdmu * self._uncorrected_srrf[index]
+            )
+            target_term = target_grad * sigma / (ion.q * AMEData.UU * 1000)
+            ref_term = reference_grad * ref_sigma / (reference.q * AMEData.UU * 1000)
+            if (ion.A, ion.element) == (reference.A, reference.element):
+                variance = (target_term + ref_term) ** 2
+            else:
+                variance = target_term**2 + ref_term**2
+            out[name] = float(abs(self._correction_derivative[index]) * np.sqrt(variance))
+        return out
 
     def _calculate_srrf(self, fref=None, brho=None, ke=None, gam=None, correct=None):
         """
@@ -196,6 +318,12 @@ class ImportData(object):
 
         Applies the slip factor formula and optional polynomial correction.
         """
+        self._reference_mode = (
+            "Frequency"
+            if fref is not None
+            else ("Brho" if brho is not None else "Kinetic Energy" if ke is not None else "Gamma")
+        )
+        self._reference_brho, self._reference_ke = brho, ke
         self.ref_mass = AMEData.to_mev(self.moq[self.ref_ion] * self.ref_charge)
         self.ref_frequency = self.reference_frequency(fref, brho, ke, gam)
         self.srrf = array(
@@ -204,7 +332,12 @@ class ImportData(object):
                 for name in self.moq
             ]
         )
+        self._uncorrected_srrf = self.srrf.copy()
+        self._correction_derivative = np.ones_like(self.srrf)
         if correct:
+            self._correction_derivative += np.polyval(
+                np.polyder(correct), self.srrf * self.ref_frequency
+            )
             correction = polyval(array(correct), self.srrf * self.ref_frequency)
             self.srrf = self.srrf + correction / self.ref_frequency
 
@@ -212,15 +345,14 @@ class ImportData(object):
         self, brho=None, harmonics=None, mode=None, sim_scalingfactor=None, nions=None
     ):
         """Generates the final simulation dictionary for plotting."""
-        for harmonic in harmonics:
-            ref_moq = self.moq[self.ref_ion]
-            if (mode or "").lower() == "brho":
-                self.brho = brho
-                ref_frequency = self.ref_frequency * harmonic
-            else:
-                ref_frequency = self.ref_frequency
+        if (mode or "").lower() == "brho":
+            self.brho = brho
+        else:
+            # The reference input is a revolution frequency; display harmonics
+            # only project the marker positions and do not change the rigidity.
+            with np.errstate(invalid="ignore"):
                 self.brho = self.calculate_brho_relativistic(
-                    ref_moq, ref_frequency, self.ring.circumference, harmonic
+                    self.moq[self.ref_ion], self.ref_frequency, self.ring.circumference, 1
                 )
 
         self.simulated_data_dict = {}
@@ -242,10 +374,22 @@ class ImportData(object):
         if sim_scalingfactor:
             self.yield_data *= sim_scalingfactor
 
+        base_uncertainties = self._mass_frequency_uncertainties()
+        self.frequency_uncertainties = {}
         for harmonic in harmonics:
             harmonic_freq = self.srrf * self.ref_frequency * harmonic
-            arr_stack = stack((harmonic_freq, self.yield_data, self.nuclei_names), axis=1)
+            heights = self.yield_data.copy()
+            metadata = getattr(self, "candidate_metadata", {})
+            for i, name in enumerate(moq_keys):
+                if not metadata.get(name, {}).get("relative_yield_known", True):
+                    heights[i] = sim_scalingfactor if sim_scalingfactor else 1.0
+            self.frequency_uncertainties[str(harmonic)] = {
+                name: None if value is None else float(abs(harmonic) * value)
+                for name, value in base_uncertainties.items()
+            }
+            arr_stack = stack((harmonic_freq, heights, self.nuclei_names), axis=1)
             self.simulated_data_dict[f"{harmonic}"] = arr_stack
+        self.all_simulated_data_dict = dict(self.simulated_data_dict)
 
     def calculate_brho_relativistic(self, moq, frequency, circumference, harmonic):
         """Calculates Magnetic Rigidity (Brho) from frequency."""

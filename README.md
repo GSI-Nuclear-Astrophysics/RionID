@@ -57,10 +57,11 @@ cd rionid
 pip install -e ".[dev]"
 ```
 
-The GUI stores local settings and file paths in `parameters_cache.toml`.
+The GUI can read legacy local settings from `parameters_cache.toml`.
 That file is ignored by Git. A sanitized template is provided as
-`parameters_cache.example.toml`; copy it locally if you want to reset or
-prepare the settings manually.
+`parameters_cache.example.toml`; copy it locally to prepare starting settings.
+Use the visible saved-run controls below to retain a configuration and results;
+running a simulation no longer overwrites the legacy settings cache.
 
 ## Quick start
 
@@ -90,6 +91,149 @@ rionid-cli examples/data/quickstart_synthetic.npz \
   -psim examples/data/candidates.lpp \
   -r 72Ge32+ -ap 0.189 -f 1930000 -hrm 127
 ```
+
+## Saving configurations, tables and replaying a run
+
+The **Saved runs: configuration and tables** panel is visible at the top of the
+GUI. Choose an **Output parent** folder and optionally enter a **Folder label**
+(for example, `203Pt` or `setting_A`).
+
+- **Run** computes the overlay in a background thread.
+- **Save config + tables** saves the current settings and matching results.
+  When the form differs from the last completed run, it saves settings only.
+- **Save results bundle (config + tables)** saves the last completed run with
+  the settings that actually produced it, even if the form has since changed.
+- **Load config…** restores settings without computing.
+- **Replay config…** restores settings, reruns the simulation, updates the
+  overlay, and checks the saved input fingerprints and numerical checkpoints.
+
+For example, saving on 6 October 2026 with label `203Pt` creates:
+
+```text
+2026-10-06_RionID_CONFIG_203Pt/
+    config.json
+    candidates.csv
+    candidates.ods
+    simulation_result.out
+```
+
+The text table name can be changed using **Text table name**; it always remains
+inside this folder. All tables include the ion label, harmonic, radiofrequency,
+revolution frequency, relative yield, ionic mass and mass-to-charge ratio. Rows
+include all calculated candidates and flag which are displayed after the top-N
+filter. Relative yields are normalized LISE++ yields, optionally scaled for
+plotting; they are not measured ion counts or production rates.
+
+Repeated saves of unchanged settings and results reuse the same folder in the
+current GUI session. Changed runs or labels create a new folder, with `_02`,
+`_03`, etc. added when necessary. Existing snapshots are not overwritten. Saved
+folders inside a checkout are ignored by Git.
+
+The JSON snapshot records all simulation settings, the NPZ array-key mapping,
+input-file SHA-256 fingerprints, the software and NumPy versions, and numerical
+checkpoints. Completed runs also retain the resolved ionic mass inputs used by
+the frequency calculation. Replay uses those saved inputs rather than querying
+a possibly changed mass table. Settings-only configurations use the current
+mass inputs when run and have no stored numerical results to verify.
+
+When **Reload Data Cache** is unchecked and an existing `*_cache.npz` is used,
+the snapshot records that cache as the effective spectrum input, including its
+actual array keys. Replay reads that exact spectrum rather than silently
+switching to the original file. Saved-run operations do not create or overwrite
+source caches and do not copy raw spectra or LISE++ files into the output folder.
+They currently support NPZ spectra or existing NPZ caches, matching the GUI's
+experimental-data workflow.
+
+If a recorded input has moved, Replay asks for its new location and verifies the
+same content. Changed inputs are rejected. Frequency checkpoints use an absolute
+`1e-5 Hz` comparison tolerance; this is a numerical replay tolerance, not a
+measurement uncertainty. Version differences and unmatched numerical results
+are reported separately.
+
+Replay is also available through Python:
+
+```python
+from rionid.session import replay_configuration, save_bundle
+
+report = replay_configuration("2026-10-06_RionID_CONFIG_203Pt/config.json")
+assert report.verified, (report.warnings, report.mismatches)
+folder, files = save_bundle(
+    "outputs", "replayed", report.completed.config, report.completed
+)
+```
+
+## Additional candidates and display
+
+Expand **Additional ions, AME search and display** to add ions such as
+`205Au76+, 205Au75+, 201Ir76+`. The LISE++ file is optional when manual ions
+or an AME search supply the candidates. Duplicate ions are merged, and the
+reference is included automatically. These additions use AME2020 ground-state
+masses; they do not supply isomer excitation energies.
+
+When a LISE++ candidate has no AME2020 mass, RionID omits that record and
+reports one summary for the file. The saved configuration retains the import
+counts and reasons; `skipped_candidates.csv` lists every omitted record.
+Duplicate transport records keep the first matching record, as in earlier
+versions. Frozen replay restores the saved ionic masses and import diagnostics
+without querying the live AME table.
+
+To explore nearby mass-to-charge ratios, enter `205Au78+` under **Search AME
+around m/q of** and set the half-width, for example `1` for ±1%. The search
+considers every AME2020 nuclide and allowed positive charge state, optionally
+restricted by the charge range. It includes AME extrapolations and labels them
+in the exported tables. A candidate satisfying this interval is a possible
+frequency overlay, not an identification or a production prediction.
+
+**Show only** and **Ions to highlight** accept exact ions (`205Au78+`),
+isotopes (`205Au`, all available charge states) and elements (`Au`). Separate
+selectors with spaces or commas. They apply across every harmonic. Changing
+these fields updates the cached overlay without recalculating the mass model.
+A filter can reveal matching candidates beyond the top-N yield selection.
+
+Manual and AME-search candidates without LISE++ yields use dash-dot markers
+at a guide height; their table yield is empty. Hover over a label to inspect
+its source and mass-input uncertainty. Candidate lines are drawn in batches.
+Large overlays render the current frequency window and at most 300 labels;
+zooming refreshes the labels while all candidates remain in the saved tables.
+
+### Mass-input frequency uncertainty
+
+**Show ±1σ mass-input frequency bands** displays the uncertainty caused by
+AME2020 mass inputs. By default, the derivative of the corrected frequency
+model propagates target and reference mass errors, with the shared reference
+handled consistently. The bands are not peak widths or a complete calibration
+uncertainty: they exclude frequency-reference, correction-model and
+electronic-binding uncertainties. AME extrapolation errors remain estimates
+from the evaluation.
+
+An optional empirical conversion can replace that derivative. For example,
+enter `50` Hz per 100 keV and harmonic `214` if that conversion was determined
+at the 214th harmonic. RionID rescales it for each displayed harmonic. In an
+older configuration that uses an RF reference and harmonic *ratios*, supply
+the corresponding multiplier instead (usually `1` at the central RF). This
+option propagates the target mass error through an approximate local scale;
+it does not determine or fit that scale. Its own uncertainty is held fixed,
+and the conversion should be used only in the region where it was calibrated.
+Distinct nuclide mass errors are treated as independent because the AME table
+does not supply their covariance; charge states of the same nuclide share their
+mass error. Press **Run** after changing the scale.
+
+The same workflow is available from the CLI:
+
+```bash
+rionid-cli spectrum.npz -psim candidates.lpp \
+  -r 204Hg77+ -ap 0.512 -f 1932523.3644859814 -hrm 210 211 212 213 214 \
+  --add-ions '205Au76+,205Au75+' \
+  --search-ion 205Au78+ --moq-tolerance-percent 1 --charge-min 70 \
+  --display-filter Au --highlight-ions 205Au --show-uncertainties \
+  --frequency-scale-hz-per-100kev 50 --uncertainty-harmonic 214 \
+  --frequency-key frequency --amplitude-key amplitude -s
+```
+
+Omit `-psim` for a manual/search-only overlay. Use `-w -o outputs` to export
+an ODS candidate table including sources, extrapolation flags and propagated
+frequency errors. New settings and resolved mass inputs are retained in saved
+GUI configurations, while older saved configurations remain readable.
 
 ## Parameter reference
 

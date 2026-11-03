@@ -70,6 +70,12 @@ class MainWindow(QWidget):
         # Update plot when a full simulation run finishes
         self.rion_input.visualization_signal.connect(self.update_visualization)
 
+    def closeEvent(self, a0):
+        if self.rion_input._busy:
+            a0.ignore()
+            return
+        super().closeEvent(a0)
+
     def update_visualization(self, data):
         """
         Updates the visualization widget with new experimental and simulated data.

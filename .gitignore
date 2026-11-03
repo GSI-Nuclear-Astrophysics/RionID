@@ -21,3 +21,6 @@ simulation_result.out
 *_cache.npz
 examples/data/quickstart_synthetic.npz
 examples/data/synthetic_demo.npz
+
+# Saved-run configurations and local result tables
+*_RionID_CONFIG*/

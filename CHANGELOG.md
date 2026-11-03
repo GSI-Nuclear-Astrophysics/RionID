@@ -4,6 +4,26 @@ All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this
 project uses [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+- Summarize unavailable LISE++ masses once per file and export the omitted
+  records with their reasons, preserving the previous duplicate-record policy.
+- Keep saved-run replay independent of the live AME table, including LISE++
+  parsing, and preserve the original import diagnostics on replay.
+
+- Add manual ion candidates and charge states independently of LISE++.
+- Search the complete AME2020 mass-to-charge catalogue with configurable
+  relative tolerance and charge bounds; retain candidate provenance and
+  extrapolation flags.
+- Filter and highlight isotopes or elements across charge states and harmonics
+  without recalculating the model.
+- Propagate mass-input uncertainties to frequency bands using the corrected
+  model derivative or an explicit local Hz/100 keV conversion.
+- Render large overlays by viewport with bulk markers and a bounded label
+  count, while retaining complete candidate tables.
+- Support the same candidate and uncertainty settings in the CLI and saved
+  configurations. Allow overlays without a LISE++ file.
+
 ## [9.0.1] - 2026-08-21
 
 ### Fixed

@@ -2,10 +2,11 @@ import re
 
 import numpy as np
 import pyqtgraph as pg
-from PyQt5.QtCore import QLoggingCategory, Qt
-from PyQt5.QtGui import QClipboard, QFont
+from PyQt5.QtCore import QLoggingCategory, Qt, QTimer
+from PyQt5.QtGui import QClipboard, QFont, QPainterPath
 from PyQt5.QtWidgets import (
     QApplication,
+    QGraphicsPathItem,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -14,6 +15,8 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from rionid.candidates import matches_selector
 
 
 class CustomLegendItem(pg.LegendItem):
@@ -125,6 +128,13 @@ class CreatePyGUI(QMainWindow):
         self.next_marker_id = 1
         self.exp_data_curve = None
         self.font_size = 14
+        self.max_candidate_labels = 300
+        self._candidate_data = None
+        self._display_options = None
+        self._rendering_candidates = False
+        self._candidate_timer = QTimer(self)
+        self._candidate_timer.setSingleShot(True)
+        self._candidate_timer.timeout.connect(self._redraw_candidates)
 
         pg.setConfigOptions(antialias=True)
         pg.setConfigOption("background", "k")
@@ -135,6 +145,7 @@ class CreatePyGUI(QMainWindow):
 
         self.setup_ui()
         self.plot_widget.scene().sigMouseClicked.connect(self._plot_clicked)
+        self.plot_widget.sigXRangeChanged.connect(self._schedule_candidate_redraw)
 
     def setup_ui(self):
         self.setWindowTitle("Schottky Signals Identifier")
@@ -166,6 +177,9 @@ class CreatePyGUI(QMainWindow):
         self.cursor_pos_label = QLabel(self)
         self.cursor_pos_label.setStyleSheet("color: black; font-weight: bold;")
         main_layout.addWidget(self.cursor_pos_label)
+        self.candidate_info_label = QLabel("Candidate markers appear after Run", self)
+        self.candidate_info_label.setWordWrap(True)
+        main_layout.addWidget(self.candidate_info_label)
         self.marker_info_label = QLabel("Select two markers to measure Δf", self)
         self.marker_info_label.setStyleSheet("color: black; font-weight: bold;")
         main_layout.addWidget(self.marker_info_label)
@@ -187,12 +201,17 @@ class CreatePyGUI(QMainWindow):
         return np.maximum(data, floor)
 
     def plot_all_data(self, data):
+        self._candidate_timer.stop()
+        self._display_options = None
+        self._rendering_candidates = True
         # Disable auto-range to prevent ViewBox from calculating bounds on partial data
         self.plot_widget.disableAutoRange()
         try:
             self.clear_experimental_data()
             self.clear_simulated_data()
             self.plot_experimental_data(data)
+            if self.saved_x_range:
+                self.plot_widget.setXRange(*self.saved_x_range, padding=0.02)
             self.plot_simulated_data(data)
 
             # Restore view or auto-range if first load
@@ -202,6 +221,7 @@ class CreatePyGUI(QMainWindow):
                 self.plot_widget.autoRange()
         finally:
             self.plot_widget.enableAutoRange()
+            self._rendering_candidates = False
 
     def plot_experimental_data(self, data):
         if data.experimental_data is None:
@@ -228,23 +248,46 @@ class CreatePyGUI(QMainWindow):
         self.plot_widget.addItem(self.exp_data_curve)
         self.legend.addItem(self.exp_data_curve, "Experimental Data")
 
-    def plot_simulated_data(self, data):
-        # Profiling at N=2000 candidates shows this method dominated not by
-        # pg.TextItem construction itself (~0.14ms/item) but by
-        # PyQtGraph's addItem/removeItem scene-graph reparenting overhead
-        # (itemChange/changeParent/signal connect-disconnect), triggered
-        # on every clear_simulated_data()+plot_simulated_data() cycle --
-        # roughly 0.7-1.2s of the ~1.4s total at N=2000. The real fix is
-        # reusing TextItem objects across redraws instead of destroying
-        # and recreating them, which requires diffing the previous vs.
-        # new (harmonic, ion) label set and correctly handling ions that
-        # change highlight/reference status between redraws (their
-        # colour must update, not just position/text). That correctness
-        # needs visual QA before implementation.
-        self.simulated_data = data.simulated_data_dict
-        refion = data.ref_ion
-        highlights = data.highlight_ions or []
+    def set_display_options(self, display_filter="", highlight_ions="", show_uncertainties=False):
+        """Redraw cached candidates without reading inputs or recomputing masses."""
+        self._display_options = dict(
+            display_filter=display_filter,
+            highlight_ions=highlight_ions,
+            show_uncertainties=show_uncertainties,
+        )
+        if self._candidate_data is not None:
+            self._redraw_candidates()
 
+    def _schedule_candidate_redraw(self, *_):
+        if self._candidate_data is not None and not self._rendering_candidates:
+            self._candidate_timer.start(90)
+
+    def _redraw_candidates(self):
+        if self._candidate_data is None or self._rendering_candidates:
+            return
+        self._rendering_candidates = True
+        try:
+            self.clear_simulated_data()
+            if self.exp_data_curve is not None:
+                self.legend.addItem(self.exp_data_curve, "Experimental Data")
+            self.plot_simulated_data(self._candidate_data)
+        finally:
+            self._rendering_candidates = False
+
+    def plot_simulated_data(self, data):
+        self._candidate_data = data
+        options = self._display_options or {}
+        selection = options.get("display_filter", getattr(data, "display_filter", ""))
+        highlights = options.get("highlight_ions", data.highlight_ions or [])
+        show_errors = options.get("show_uncertainties", getattr(data, "show_uncertainties", False))
+        source = (
+            getattr(data, "all_simulated_data_dict", data.simulated_data_dict)
+            if selection
+            else data.simulated_data_dict
+        )
+        self.simulated_data = source
+        metadata = getattr(data, "candidate_metadata", {})
+        errors = getattr(data, "frequency_uncertainties", {})
         color_cycle = [
             "#1f77b4",
             "#17becf",
@@ -256,118 +299,149 @@ class CreatePyGUI(QMainWindow):
             "#7f7f7f",
             "#bcbd22",
         ]
-
-        color_ref = "#ff7f0e"  # Orange for Reference
-        color_match = "#2ca02c"  # Green for Matches
         label_font = QFont("Arial", self.font_size)
+        total = sum(len(rows) for rows in source.values())
+        visible_range = self.plot_widget.viewRange()[0]
+        if self.saved_x_range is not None and (visible_range[1] - visible_range[0]) < 1e-9:
+            visible_range = self.saved_x_range
+        margin = max((visible_range[1] - visible_range[0]) * 0.03, 1e-5)
+        small_overlay = total <= self.max_candidate_labels
+        plotted_count = 0
+        labels_left = self.max_candidate_labels
+        labels_per_harmonic = max(1, self.max_candidate_labels // max(len(source), 1))
+        self.rendered_candidate_names = set()
+        self.rendered_label_count = 0
+        self.rendered_uncertainty_count = 0
+        self.uncertainty_items = []
 
-        for i, (harmonic, sdata) in enumerate(self.simulated_data.items()):
-            # Arrays for bulk plotting (Vectorization)
-            bulk_freqs = []
-            bulk_yields = []
-            finite_yields = []
-            for entry in sdata:
-                try:
-                    candidate_yield = float(entry[1])
-                except (ValueError, TypeError):
-                    continue
-                if np.isfinite(candidate_yield) and candidate_yield > 1.1e-9:
-                    finite_yields.append(candidate_yield)
-            visible_reference_yield = max(finite_yields, default=1.0)
-
-            # Generate a unique color for this harmonic
+        for i, (harmonic, rows) in enumerate(source.items()):
+            if not len(rows):
+                continue
+            frequency = np.asarray(rows[:, 0], dtype=float) * 1e-6
+            heights = np.asarray(rows[:, 1], dtype=float)
+            names = np.asarray(rows[:, 2], dtype=str)
+            keep = np.isfinite(frequency)
+            if not small_overlay:
+                keep &= (frequency >= visible_range[0] - margin) & (
+                    frequency <= visible_range[1] + margin
+                )
+            if selection:
+                keep &= np.fromiter(
+                    (matches_selector(n, selection) for n in names), bool, len(names)
+                )
+            indices = np.flatnonzero(keep)
+            if not len(indices):
+                continue
             color = color_cycle[i % len(color_cycle)]
+            positive = heights[np.isfinite(heights) & (heights > 1.1e-9)]
+            reference_height = float(np.max(positive)) if len(positive) else 1.0
+            unknown = np.fromiter(
+                (not metadata.get(n, {}).get("relative_yield_known", True) for n in names),
+                bool,
+                len(names),
+            )
+            heights = np.where(np.isfinite(heights), np.maximum(heights, 1.1e-9), 1.1e-9)
+            heights[(names == data.ref_ion) & (heights <= 1.1e-9)] = reference_height
+            heights[unknown] = max(reference_height * 0.8, 1.1e-9)
+            highlighted = np.fromiter(
+                (matches_selector(n, highlights) for n in names), bool, len(names)
+            )
+            reference = names == data.ref_ion
+            priority = highlighted | reference | unknown
+            ordered = sorted(indices, key=lambda j: (not priority[j], -heights[j], frequency[j]))
+            label_indices = set(ordered[: min(labels_left, labels_per_harmonic)])
+            labels_left -= len(label_indices)
+            plotted_count += len(indices)
+            self.rendered_candidate_names.update(names[indices])
+            groups = {}
+            harmonic_errors = errors.get(str(harmonic), {})
+            band_path = QPainterPath()
 
-            for entry in sdata:
-                try:
-                    freq = float(entry[0]) * 1e-6
-                    raw_yield = float(entry[1])
-                except (ValueError, TypeError):
-                    continue
-
-                if not np.isfinite(freq):
-                    continue
-                yield_value = max(raw_yield, 1.1e-9)
-                label = entry[2]
-
-                is_highlight = label in highlights
-                is_ref = label == refion
-
-                # A missing LISE++ yield is represented by the log-safety
-                # floor. Keep the reference anchor visible at the tallest
-                # candidate height instead of drawing it at 1e-9.
-                if is_ref and yield_value <= 1.1e-9:
-                    yield_value = visible_reference_yield
-
-                # Determine Style
-                width = style = None  # only read under is_highlight/is_ref, set below
-                if is_highlight:
-                    c = color_match
-                    width = 2
-                    style = Qt.SolidLine
-                elif is_ref:
-                    c = color_ref
-                    width = 2
-                    style = Qt.DashLine
+            for j in indices:
+                name, freq, height = str(names[j]), frequency[j], heights[j]
+                if highlighted[j]:
+                    c, style, width = "#55d96b", Qt.SolidLine, 2
+                elif reference[j]:
+                    c, style, width = "#ff7f0e", Qt.DashLine, 2
+                elif unknown[j]:
+                    c, style, width = color, Qt.DashDotLine, 1.8
                 else:
-                    c = color
-                    # No need for width/style here, handled by bulk curve
-
-                # Create Text Label
-                # Note: Creating thousands of TextItems is still slow.
-                # Use the '-n' (nions) argument to limit this if it's still laggy.
-                match = re.match(r"(\d+)([A-Za-z]+)(\d+)\+", label)
-                if match:
-                    mass, elem, charge = match.groups()
-                    new_label = self.to_superscript(mass) + elem + self.to_superscript(charge) + "⁺"
-                else:
-                    new_label = label
-
-                text_item = pg.TextItem(text=new_label, color=c, anchor=(0.5, 1))
-                text_item.setFont(label_font)
-                text_item.setPos(freq, yield_value * 1.05)
-                self.plot_widget.addItem(text_item)
-
-                if is_highlight or is_ref:
-                    # Use the same direct PlotCurveItem path as ordinary
-                    # ions. plot_widget.plot() applies log handling
-                    # differently and displaced reference/highlight lines.
+                    c, style, width = color, Qt.DotLine, 1.5
+                sigma = harmonic_errors.get(name)
+                sigma = float(sigma) if sigma is not None else np.nan
+                if show_errors and np.isfinite(sigma) and sigma > 0:
+                    band_path.addRect(
+                        freq - sigma * 1e-6, 1e-9, 2 * sigma * 1e-6, max(height - 1e-9, 1e-9)
+                    )
+                    self.rendered_uncertainty_count += 1
+                text_item = None
+                if j in label_indices:
+                    match = re.fullmatch(r"(\d+)([A-Za-z]+)(\d+)\+", name)
+                    if match:
+                        mass, elem, charge = match.groups()
+                        label = self.to_superscript(mass) + elem + self.to_superscript(charge) + "⁺"
+                    else:
+                        label = name
+                    text_item = pg.TextItem(text=label, color=c, anchor=(0.5, 1))
+                    text_item.setFont(label_font)
+                    text_item.setPos(freq, height * 1.05)
+                    info = metadata.get(name, {})
+                    origin = ", ".join(info.get("sources", [info.get("source", "lise")]))
+                    tooltip = f"{name} · harmonic {harmonic}\n{freq * 1e6:.6f} Hz\nSource: {origin}"
+                    if unknown[j]:
+                        tooltip += "\nNo LISE++ yield; marker height is a display guide."
+                    if np.isfinite(sigma):
+                        tooltip += f"\nMass-input σf: {sigma:.6g} Hz"
+                    if info.get("mass_extrapolated"):
+                        tooltip += "\nAME2020 extrapolated mass (#)."
+                    text_item.setToolTip(tooltip)
+                    self.plot_widget.addItem(text_item)
+                    self.rendered_label_count += 1
+                if (highlighted[j] or reference[j]) and text_item is not None:
                     line = pg.PlotCurveItem(
-                        [freq, freq],
-                        [1e-9, yield_value],
-                        pen=pg.mkPen(color=c, width=width, style=style),
+                        [freq, freq], [1e-9, height], pen=pg.mkPen(c, width=width, style=style)
                     )
                     self.plot_widget.addItem(line)
                     self.simulated_items.append((line, text_item))
                 else:
-                    # Add STANDARD lines to bulk arrays for optimization
-                    bulk_freqs.append(freq)
-                    bulk_yields.append(yield_value)
-                    # Track text item (line is None because it's part of the bulk curve)
-                    self.simulated_items.append((None, text_item))
-
-            # --- BULK PLOT ---
-            # Draw all standard lines for this harmonic in ONE go
-            if bulk_freqs:
-                # Interleave arrays for connect='pairs'
-                # x: [f1, f1, f2, f2, ...]
-                # y: [min, y1, min, y2, ...]
-                x_conn = np.repeat(bulk_freqs, 2)
-                y_conn = np.empty(len(bulk_yields) * 2)
-                y_conn[0::2] = 1e-9
-                y_conn[1::2] = bulk_yields
-
-                bulk_pen = pg.mkPen(color=color, width=2, style=Qt.DotLine)
-
-                # connect='pairs' tells PyQtGraph to draw disjoint lines: (p0->p1), (p2->p3), etc.
-                bulk_curve = pg.PlotCurveItem(x_conn, y_conn, connect="pairs", pen=bulk_pen)
-                self.plot_widget.addItem(bulk_curve)
-
-                # Track the bulk curve so we can clear it later
-                self.simulated_items.append((bulk_curve, None))
-
-                # Add to legend
-                self.legend.addItem(bulk_curve, f"Harmonic {harmonic}")
+                    groups.setdefault((c, style, width), []).append((freq, height))
+                    if text_item is not None:
+                        self.simulated_items.append((None, text_item))
+            for (c, style, width), values in groups.items():
+                values = np.asarray(values)
+                x = np.repeat(values[:, 0], 2)
+                y = np.empty(len(x))
+                y[0::2], y[1::2] = 1e-9, values[:, 1]
+                curve = pg.PlotCurveItem(
+                    x, y, connect="pairs", pen=pg.mkPen(c, width=width, style=style)
+                )
+                self.plot_widget.addItem(curve)
+                self.simulated_items.append((curve, None))
+            key = pg.PlotCurveItem(pen=pg.mkPen(color, width=2))
+            self.legend.addItem(key, f"Harmonic {harmonic}")
+            if not band_path.isEmpty():
+                band = QGraphicsPathItem(band_path)
+                band.setPen(pg.mkPen(None))
+                shade = pg.mkColor(color)
+                shade.setAlpha(38)
+                band.setBrush(pg.mkBrush(shade))
+                band.setZValue(-5)
+                band.setToolTip(
+                    "±1σ propagated AME mass inputs; excludes calibration-model "
+                    "and electronic-binding uncertainties."
+                )
+                self.plot_widget.addItem(band)
+                self.simulated_items.append((band, None))
+                self.uncertainty_items.append(band)
+        self.rendered_candidate_count = plotted_count
+        self.candidate_info_label.setText(
+            f"{plotted_count:,} candidate markers in view · {self.rendered_label_count:,} labels"
+            + (
+                " · dash-dot markers: no LISE++ yield"
+                if any(not item.get("relative_yield_known", True) for item in metadata.values())
+                else ""
+            )
+        )
 
     def to_superscript(self, s):
         supers = {

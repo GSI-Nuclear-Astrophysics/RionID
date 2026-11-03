@@ -3,12 +3,13 @@ import logging as log
 import os
 import sys
 
-from numpy import append, argsort, shape, where
+from numpy import append, argsort, where
 from PyQt5.QtWidgets import QApplication
 
-from rionid.core import ImportData
+from rionid.gui.controller import import_controller
 from rionid.gui.plot import CreatePyGUI
 from rionid.io import write_arrays_to_ods
+from rionid.session import candidate_rows
 
 ESR_CIRCUMFERENCE_M = 108.36
 
@@ -38,12 +39,45 @@ def build_parser():
         "-psim",
         "--filep",
         type=str,
-        required=True,
-        help="Path to particle list file (LISE++ output).",
+        default="",
+        help="LISE++ candidate list (optional with --add-ions or --search-ion).",
     )
     parser.add_argument(
         "-hrm", "--harmonics", type=float, default=[1.0], nargs="+", help="Harmonics to simulate."
     )
+
+    parser.add_argument("--add-ions", default="", help="Additional ions, e.g. '205Au76+,205Au75+'.")
+    parser.add_argument("--search-ion", default="", help="Search AME2020 m/q near this ion.")
+    parser.add_argument(
+        "--moq-tolerance-percent",
+        type=float,
+        default=1.0,
+        help="Relative m/q half-width, in percent (default: 1).",
+    )
+    parser.add_argument("--charge-min", type=int, default=1)
+    parser.add_argument(
+        "--charge-max", type=int, default=None, help="Maximum q; default is each nuclide's Z."
+    )
+    parser.add_argument(
+        "--display-filter", default="", help="Show only an ion, isotope or element."
+    )
+    parser.add_argument("--highlight-ions", default="", help="Ion, isotope or element selectors.")
+    parser.add_argument(
+        "--show-uncertainties", action="store_true", help="Show ±1σ mass-input bands."
+    )
+    parser.add_argument(
+        "--frequency-scale-hz-per-100kev",
+        type=float,
+        help="Optional empirical conversion X Hz per 100 keV.",
+    )
+    parser.add_argument(
+        "--uncertainty-harmonic",
+        type=float,
+        default=1.0,
+        help="Harmonic/multiplier at which the empirical scale applies.",
+    )
+    parser.add_argument("--frequency-key", default="arr_0", help="Frequency array key in the NPZ.")
+    parser.add_argument("--amplitude-key", default="arr_1", help="Amplitude array key in the NPZ.")
 
     # Secondary Arguments
     parser.add_argument(
@@ -110,6 +144,8 @@ def main():
 
     args = parser.parse_args()
 
+    if not (args.filep or args.add_ions or args.search_ion):
+        parser.error("Provide --filep, --add-ions or --search-ion.")
     # Argument Validation
     if args.circumference <= 0:
         parser.error("--circumference must be greater than zero.")
@@ -157,6 +193,18 @@ def main():
             nions=args.nions,
             show=args.show,
             app=app,
+            manual_ions=args.add_ions,
+            search_ion=args.search_ion,
+            moq_tolerance_percent=args.moq_tolerance_percent,
+            charge_min=args.charge_min,
+            charge_max=args.charge_max,
+            display_filter=args.display_filter,
+            highlight_ions=args.highlight_ions,
+            show_uncertainties=args.show_uncertainties,
+            frequency_scale_hz_per_100kev=args.frequency_scale_hz_per_100kev,
+            uncertainty_harmonic=args.uncertainty_harmonic,
+            io_params={"frequency_key": args.frequency_key, "amplitude_key": args.amplitude_key},
+            output_dir=args.outdir,
         )
 
     if args.show and app:
@@ -179,6 +227,18 @@ def run_controller(
     nions=None,
     show=True,
     app=None,
+    manual_ions="",
+    search_ion="",
+    moq_tolerance_percent=1.0,
+    charge_min=1,
+    charge_max=None,
+    display_filter="",
+    highlight_ions="",
+    show_uncertainties=False,
+    frequency_scale_hz_per_100kev=None,
+    uncertainty_harmonic=1.0,
+    io_params=None,
+    output_dir=None,
 ):
     """
     Unified controller: Calculates physics and launches the PyQt GUI.
@@ -216,50 +276,62 @@ def run_controller(
     app : QApplication, optional
         The Qt application instance.
     """
-    # 1. Calculations (Model)
-    mydata = ImportData(ref_ion, alphap, filename=data_file, circumference=circumference)
-    log.debug(f"Experimental data shape: {shape(mydata.experimental_data)}")
-
-    mydata._set_particles_to_simulate_from_file(particles_to_simulate)
-    mydata._calculate_moqs()
-
-    # Calculate Reference Frequency
-    mydata._calculate_srrf(fref=fref, brho=brho, ke=ke, gam=gam, correct=correct)
-    log.debug(f"Reference Frequency: {mydata.ref_frequency}")
-
-    # Simulate Data
-    if not isinstance(harmonics, list):
+    if fref is not None:
+        mode, value = "Frequency", fref
+    elif brho is not None:
+        mode, value = "Brho", brho
+    elif ke is not None:
+        mode, value = "Kinetic Energy", ke
+    else:
+        mode, value = "Gamma", gam
+    if not isinstance(harmonics, (list, tuple)):
         harmonics = [harmonics]
-
-    mydata._simulated_data(harmonics=harmonics, brho=brho, mode="frequency" if fref else "brho")
-
-    # 2. Filter Ions (Optional)
-    if nions:
-        display_nions(
-            nions,
-            mydata.yield_data,
-            mydata.nuclei_names,
-            mydata.simulated_data_dict,
-            ref_ion,
-            harmonics,
-        )
-
-    # 3. Logging & ODS Export
-    sort_index = argsort(mydata.srrf)
+    mydata = import_controller(
+        datafile=data_file,
+        filep=particles_to_simulate or "",
+        alphap=alphap,
+        refion=ref_ion,
+        harmonics=list(harmonics),
+        circumference=circumference,
+        mode=mode,
+        value=value,
+        correct=correct,
+        nions=nions,
+        reload_data=True,
+        io_params=io_params or {"frequency_key": "arr_0", "amplitude_key": "arr_1"},
+        output_path=None,
+        write_cache=False,
+        manual_ions=manual_ions,
+        search_ion=search_ion,
+        moq_tolerance_percent=moq_tolerance_percent,
+        charge_min=charge_min,
+        charge_max=charge_max,
+        display_filter=display_filter,
+        highlight_ions=highlight_ions,
+        show_uncertainties=show_uncertainties,
+        frequency_scale_hz_per_100kev=frequency_scale_hz_per_100kev,
+        uncertainty_harmonic=uncertainty_harmonic,
+    )
     if ods:
-        write_arrays_to_ods(
-            "Data_simulated_RionID",
-            "Data",
-            ["Name", "freq", "yield"],
-            (mydata.nuclei_names)[sort_index],
-            (mydata.srrf)[sort_index] * mydata.ref_frequency,
-            (mydata.yield_data)[sort_index],
-        )
+        from pathlib import Path
 
-    # 4. Visualization (View)
+        destination = Path(output_dir or os.getcwd())
+        destination.mkdir(parents=True, exist_ok=True)
+        rows = candidate_rows(mydata)
+        columns = list(rows[0])
+        write_arrays_to_ods(
+            str(destination / "Data_simulated_RionID.ods"),
+            "Candidates",
+            columns,
+            *[["" if row[column] is None else row[column] for row in rows] for column in columns],
+        )
     if show and app:
-        sa = CreatePyGUI(mydata.experimental_data, mydata.simulated_data_dict)
-        sa.show()
+        window = CreatePyGUI()
+        window.updateData(mydata)
+        window.show()
+        if not hasattr(app, "rionid_windows"):
+            app.rionid_windows = []
+        app.rionid_windows.append(window)
 
     return mydata
 

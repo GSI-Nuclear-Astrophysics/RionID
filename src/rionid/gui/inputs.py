@@ -557,17 +557,17 @@ class RionID_GUI(QWidget):
         self.run_status_label.setText(
             "Simulation complete. Save config + tables to retain this run."
         )
-        skipped = getattr(completed.data, 'skipped_lise_candidates', [])
+        skipped = getattr(completed.data, "skipped_lise_candidates", [])
         if skipped:
             self.run_status_label.setText(
-                f'Simulation complete. {len(skipped)} LISE++ records were omitted. '
-                'Save results for skipped_candidates.csv and the reasons.'
+                f"Simulation complete. {len(skipped)} LISE++ records were omitted. "
+                "Save results for skipped_candidates.csv and the reasons."
             )
-            self.run_status_label.setToolTip('\n'.join(
-                f'{entry["ion"]}: {entry["reason"]}' for entry in skipped[:20]
-            ))
+            self.run_status_label.setToolTip(
+                "\n".join(f"{entry['ion']}: {entry['reason']}" for entry in skipped[:20])
+            )
         else:
-            self.run_status_label.setToolTip('')
+            self.run_status_label.setToolTip("")
 
     def run_script(self):
         if self._busy or not self.datafile_edit.text().strip():

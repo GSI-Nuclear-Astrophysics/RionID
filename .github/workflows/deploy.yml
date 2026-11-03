@@ -25,7 +25,8 @@ jobs:
     - name: Install dependencies
       run: |
         # Install documentation tools
-        pip install mkdocs-material mkdocstrings[python] mkdocs-gen-files mkdocs-literate-nav
+        # pymdown-extensions 12 breaks mkdocstrings' code highlighter (Highlight() needs `md`)
+        pip install mkdocs-material "mkdocstrings[python]" mkdocs-gen-files mkdocs-literate-nav "pymdown-extensions<12"
         # Install the package itself (so mkdocstrings can import it)
         pip install .
 

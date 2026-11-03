@@ -1,3 +1,4 @@
+import math
 import os
 import re
 import sys
@@ -5,10 +6,18 @@ import sys
 import numpy as np
 from numpy import array, polyval, sqrt, stack
 
-from rionid.candidates import ion_from_ame, mass_metadata, parse_ion, search_moq, split_ions
+from rionid.candidates import (
+    ion_from_ame,
+    mass_metadata,
+    matches_selector,
+    parse_ion,
+    search_moq,
+    split_ions,
+)
 from rionid.external.lisereader.reader import LISEreader
 from rionid.io import handle_spectrumnpz_data
-from rionid.masses import AMEData, Ring, get_ame_data, ionic_moq_u
+from rionid.isomers import get_nubase_data
+from rionid.masses import AMEData, Ring, get_ame_data, ionic_mass_u, ionic_moq_u
 
 
 class ImportData(object):
@@ -253,6 +262,39 @@ class ImportData(object):
                 ion.name, mass / ion.q, mass, ion.Z, mass_metadata(row, "reference")
             )
 
+    def _add_isomers(self, only=""):
+        """Add the Nubase2020 isomers of every nuclide present, in the charge
+        states that nuclide already has. Mass = ground state + excitation energy.
+
+        `only` is an optional ion/isotope/element selector list (for example
+        "205Au, 206Hg"); empty means every nuclide."""
+        ame = getattr(self, "ame", None)
+        if ame is None:
+            self.ame = ame = get_ame_data()
+        nubase = get_nubase_data()
+        charges = {}
+        for name in list(self.moq):
+            ion = parse_ion(name)
+            if not ion.isomer and (not only or matches_selector(name, only)):
+                charges.setdefault((ion.element, ion.A), []).append(ion.q)
+        for (element, a), qs in charges.items():
+            row = ame.lookup(element, a)
+            if row is None:
+                continue
+            for isomer in nubase.isomers(element, a):
+                shift = AMEData.to_u(isomer.excitation_keV / 1000)
+                for q in qs:
+                    mass = float(ionic_mass_u(row, q)) + shift
+                    metadata = mass_metadata(row, "isomer")
+                    if metadata["mass_uncertainty_keV"] is not None:
+                        metadata["mass_uncertainty_keV"] = math.hypot(
+                            metadata["mass_uncertainty_keV"], isomer.excitation_unc_keV
+                        )
+                    metadata["mass_extrapolated"] |= isomer.extrapolated
+                    self._add_candidate(
+                        f"{a}{element}{isomer.label}{q}+", mass / q, mass, row[4], metadata
+                    )
+
     def _add_candidate(self, name, moq, mass, z, metadata):
         if name in self.moq:
             old = self.candidate_metadata.setdefault(name, dict(metadata))
@@ -305,7 +347,11 @@ class ImportData(object):
             )
             target_term = target_grad * sigma / (ion.q * AMEData.UU * 1000)
             ref_term = reference_grad * ref_sigma / (reference.q * AMEData.UU * 1000)
-            if (ion.A, ion.element) == (reference.A, reference.element):
+            if (ion.A, ion.element, ion.isomer) == (
+                reference.A,
+                reference.element,
+                reference.isomer,
+            ):
                 variance = (target_term + ref_term) ** 2
             else:
                 variance = target_term**2 + ref_term**2

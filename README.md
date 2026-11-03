@@ -196,6 +196,22 @@ its source and mass-input uncertainty. Candidate lines are drawn in batches.
 Large overlays render the current frequency window and at most 300 labels;
 zooming refreshes the labels while all candidates remain in the saved tables.
 
+### Isomers
+
+**Show isomers (Nubase2020)** (CLI: `--show-isomers`) adds, for every distinct
+nuclide in the simulation (LISE++, added ions, AME search and the reference),
+the isomers listed in Nubase2020, in the charge states that nuclide already
+has. An isomer's mass is the AME2020 ground-state mass plus its excitation
+energy, and its mass uncertainty combines both. Isomers are named with the
+Nubase label, for example `180Hfm70+`, are selected by their nuclide filter
+(`180Hf`), and have no predicted yield, so their marker heights are display
+guides. To limit the isomers to some nuclides, enter ions, isotopes or elements in
+**Isomers only for** (CLI: `--isomer-filter`), for example `205Au, 206Hg`;
+empty means all, and an ion such as `205Au76+` restricts the charge state too.
+The option takes effect on the next run and is saved with the
+configuration. Nubase is read from `~/.ame/nubase.data` and downloaded there
+if absent.
+
 ### Mass-input frequency uncertainty
 
 **Show ±1σ mass-input frequency bands** displays the uncertainty caused by

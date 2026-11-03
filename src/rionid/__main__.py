@@ -66,6 +66,16 @@ def build_parser():
         "--show-uncertainties", action="store_true", help="Show ±1σ mass-input bands."
     )
     parser.add_argument(
+        "--show-isomers",
+        action="store_true",
+        help="Add the Nubase2020 isomers of every simulated nuclide.",
+    )
+    parser.add_argument(
+        "--isomer-filter",
+        default="",
+        help="With --show-isomers, only for these ions, isotopes or elements, e.g. '205Au,206Hg'.",
+    )
+    parser.add_argument(
         "--frequency-scale-hz-per-100kev",
         type=float,
         help="Optional empirical conversion X Hz per 100 keV.",
@@ -201,6 +211,8 @@ def main():
             display_filter=args.display_filter,
             highlight_ions=args.highlight_ions,
             show_uncertainties=args.show_uncertainties,
+            show_isomers=args.show_isomers,
+            isomer_filter=args.isomer_filter,
             frequency_scale_hz_per_100kev=args.frequency_scale_hz_per_100kev,
             uncertainty_harmonic=args.uncertainty_harmonic,
             io_params={"frequency_key": args.frequency_key, "amplitude_key": args.amplitude_key},
@@ -235,6 +247,8 @@ def run_controller(
     display_filter="",
     highlight_ions="",
     show_uncertainties=False,
+    show_isomers=False,
+    isomer_filter="",
     frequency_scale_hz_per_100kev=None,
     uncertainty_harmonic=1.0,
     io_params=None,
@@ -309,6 +323,8 @@ def run_controller(
         display_filter=display_filter,
         highlight_ions=highlight_ions,
         show_uncertainties=show_uncertainties,
+        show_isomers=show_isomers,
+        isomer_filter=isomer_filter,
         frequency_scale_hz_per_100kev=frequency_scale_hz_per_100kev,
         uncertainty_harmonic=uncertainty_harmonic,
     )

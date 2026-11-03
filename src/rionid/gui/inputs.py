@@ -134,6 +134,8 @@ class RionID_GUI(QWidget):
             "frequency_scale_hz_per_100kev": self.frequency_scale_hz_per_100kev_edit.text(),
             "uncertainty_harmonic": self.uncertainty_harmonic_edit.text(),
             "show_uncertainties": self.show_uncertainties_checkbox.isChecked(),
+            "show_isomers": self.show_isomers_checkbox.isChecked(),
+            "isomer_filter": self.isomer_filter_edit.text(),
         }
 
     def _restore_form_values(self, values):
@@ -170,7 +172,9 @@ class RionID_GUI(QWidget):
         ):
             getattr(self, name + "_edit").setText(str(values.get(name, default)))
         self.show_uncertainties_checkbox.setChecked(values.get("show_uncertainties", False))
-        if values.get("manual_ions") or values.get("search_ion"):
+        self.show_isomers_checkbox.setChecked(values.get("show_isomers", False))
+        self.isomer_filter_edit.setText(str(values.get("isomer_filter", "")))
+        if values.get("manual_ions") or values.get("search_ion") or values.get("show_isomers"):
             self.candidate_options_toggle.setChecked(True)
 
     def load_parameters(self, filepath="parameters_cache.toml"):
@@ -346,6 +350,20 @@ class RionID_GUI(QWidget):
         )
         note.setWordWrap(True)
         form.addRow(note)
+        self.show_isomers_checkbox = QCheckBox("Show isomers (Nubase2020)")
+        self.show_isomers_checkbox.setToolTip(
+            "Adds every listed isomer of each nuclide, in that nuclide's charge states. "
+            "Takes effect on the next Run."
+        )
+        form.addRow(self.show_isomers_checkbox)
+        self.isomer_filter_edit = QLineEdit()
+        self.isomer_filter_edit.setPlaceholderText("Empty: all nuclides; or e.g. 205Au, 206Hg")
+        self.isomer_filter_edit.setToolTip(
+            "Only add isomers for these ions, isotopes (205Au) or elements (Au)."
+        )
+        self.isomer_filter_edit.setEnabled(False)
+        self.show_isomers_checkbox.toggled.connect(self.isomer_filter_edit.setEnabled)
+        form.addRow("Isomers only for", self.isomer_filter_edit)
         self.display_filter_edit = QLineEdit()
         self.display_filter_edit.setPlaceholderText(
             "Empty: all; 205Au: all its charge states; Au: all gold"
@@ -484,6 +502,8 @@ class RionID_GUI(QWidget):
             ),
             uncertainty_harmonic=float(values["uncertainty_harmonic"] or "1"),
             show_uncertainties=values["show_uncertainties"],
+            show_isomers=values["show_isomers"],
+            isomer_filter=values["isomer_filter"].strip(),
         )
         config.validate()
         return config
@@ -599,6 +619,8 @@ class RionID_GUI(QWidget):
                 ),
                 "uncertainty_harmonic": repr(config.uncertainty_harmonic),
                 "show_uncertainties": config.show_uncertainties,
+                "show_isomers": config.show_isomers,
+                "isomer_filter": config.isomer_filter,
             }
         )
         self._loaded_config = config
@@ -608,6 +630,7 @@ class RionID_GUI(QWidget):
                 or config.search_ion
                 or config.display_filter
                 or config.show_uncertainties
+                or config.show_isomers
                 or config.frequency_scale_hz_per_100kev
             )
         )

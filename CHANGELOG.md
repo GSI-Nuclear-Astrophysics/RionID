@@ -21,6 +21,12 @@ project uses [Semantic Versioning](https://semver.org/).
   model derivative or an explicit local Hz/100 keV conversion.
 - Render large overlays by viewport with bulk markers and a bounded label
   count, while retaining complete candidate tables.
+- Add a **Show isomers** option (`--show-isomers`) that adds the Nubase2020
+  isomers of every simulated nuclide, in that nuclide's charge states, with
+  mass = AME2020 ground state + excitation energy. Isomers are named like
+  `180Hfm70+` and carry no yield, like other manual candidates. An optional
+  filter (`--isomer-filter`, e.g. `205Au,206Hg`) restricts them to chosen
+  nuclides.
 - Support the same candidate and uncertainty settings in the CLI and saved
   configurations. Allow overlays without a LISE++ file.
 

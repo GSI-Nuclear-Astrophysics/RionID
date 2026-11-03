@@ -35,6 +35,8 @@ def import_controller(
     frequency_scale_hz_per_100kev=None,
     uncertainty_harmonic=1.0,
     show_uncertainties=False,
+    show_isomers=False,
+    isomer_filter="",
 ):
     """
     Main orchestration function for the RionID simulation workflow.
@@ -139,12 +141,20 @@ def import_controller(
                 )
             if mydata.ref_ion not in mydata.moq:
                 mydata._extend_candidates()
+            if show_isomers:
+                mydata._add_isomers(isomer_filter)
         else:
             if filep:
                 mydata._set_particles_to_simulate_from_file(filep, load_masses=False)
             allowed_names = {f"{p[1]}{p[0]}{p[4][-1]}+" for p in mydata.particles_to_simulate}
             allowed_names.update(parse_ion(name).name for name in split_ions(manual_ions))
             allowed_names.add(mydata.ref_ion)
+            if show_isomers:
+                allowed_names.update(
+                    ion
+                    for ion, entry in ionic_inputs.items()
+                    if "isomer" in entry.get("metadata", {}).get("sources", [])
+                )
             if not search_ion and not set(ionic_inputs) <= allowed_names:
                 raise ValueError("Saved ionic inputs do not match the candidate list")
             for ion, entry in ionic_inputs.items():
@@ -203,7 +213,10 @@ def import_controller(
                 visible = set(mydata.simulated_data_dict[harmonic][:, 2])
                 for row in full_rows:
                     sources = mydata.candidate_metadata.get(str(row[2]), {}).get("sources", [])
-                    if any(source in sources for source in ("manual", "ame_search", "reference")):
+                    if any(
+                        source in sources
+                        for source in ("manual", "ame_search", "reference", "isomer")
+                    ):
                         visible.add(str(row[2]))
                 mydata.simulated_data_dict[harmonic] = full_rows[
                     [str(row[2]) in visible for row in full_rows]

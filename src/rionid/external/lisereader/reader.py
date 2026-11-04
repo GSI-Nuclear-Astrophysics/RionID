@@ -8,6 +8,7 @@ from rionid.candidates import parse_ion
 from rionid.masses import get_ame_data
 
 log = logging.getLogger(__name__)
+_reported = set()
 
 
 class MissingMassError(ValueError):
@@ -20,6 +21,7 @@ class LISEreader:
         self.ame_data = self.ame.ame_table if self.ame is not None else []
         self.skipped_entries = []
         self.summary = {}
+        self.filename = str(filename)
         self._read(filename)
         self._indices = {}
         for i, row in enumerate(self.data):
@@ -132,8 +134,12 @@ class LISEreader:
             "missing_mass_nuclides": sorted(missing),
             "invalid_records": sum(r["kind"] == "invalid_record" for r in self.skipped_entries),
         }
+        # A run re-reads the same file (preview, replay); warn once per file and result.
+        key = (self.filename, len(result), len(self.skipped_entries))
         if self.skipped_entries:
-            log.warning(
+            report = log.debug if key in _reported else log.warning
+            _reported.add(key)
+            report(
                 "LISE++: %d usable records; omitted %d records (%d nuclides absent from AME2020, "
                 "%d invalid records). Save results for the detailed skipped-candidate list.",
                 len(result),

@@ -69,6 +69,14 @@ def test_missing_masses_emit_one_summary_and_keep_detailed_records(tmp_path, cap
         reader.get_info("177Dy66+")
 
 
+def test_repeated_reads_of_one_file_warn_once(tmp_path, caplog):
+    path = lise_file(tmp_path, ["204Hg 77 =1.0", "177Dy 66 =1e-8"])
+    with caplog.at_level(logging.WARNING):
+        LISEreader(path).get_info_all()
+        LISEreader(path).get_info_all()
+    assert len([r for r in caplog.records if r.levelno == logging.WARNING]) == 1
+
+
 def test_malformed_short_charge_and_yield_records_are_diagnosed(tmp_path, caplog):
     path = lise_file(
         tmp_path,
